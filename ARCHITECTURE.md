@@ -1,17 +1,25 @@
 # ARCHITECTURE.md
 
 ## 模块说明
-系统采用“编排器 + 可替换适配器”架构。
+菲比演唱器是一个面向本地音频处理的可插拔流水线。系统接收歌曲文件和可选歌词，依次完成音频素材准备、歌词识别或读取、歌词改写、 ACE-Step 1.5 歌曲生成以及 RVC 菲比音色转换。当前实现优先保证流程边界、规则校验和 dry-run 可验证性；真实模型由外部适配器和用户配置接入。
 
-## 数据流
-`input audio -> separation -> transcription -> lyric rewrite -> ACE-Step lyric edit -> RVC voice conversion -> output audio`
+## 目录结构
+- `feibi_singer/models.py`：定义 PipelineConfig、StageResult 和 PipelineReport 等领域数据结构；
+- `feibi_singer/feibi_rules.py`：执行多语言启发式音节计数、菲比模式生成和歌词硬规则校验；
+- `feibi_singer/adapters.py`：封装分离、ASR、ACE-Step 和 RVC 的外部命令边界； dry-run 时只生成阶段计划；
+- `feibi_singer/pipeline.py`：唯一的业务流程编排入口，负责阶段顺序、工件保存和最终报告；
+- `scripts/feibi_pipeline.py`：命令行入口，读取输入音频、歌词和 JSON 配置并启动流水线；
+- `tests/test_rules.py`：菲比规则和多语言音节计数的单元测试；
+- `tests/test_pipeline.py`：dry-run 流水线集成测试；
+- `config.example.json`：外部工具命令、设备、语言和 RVC 模型路径的配置模板；
+- `AGENT.md`：项目级开发约束、Harness 工作流程和验证要求；
+- `harness/harness_context.py`：Harness JSON 与 Markdown 双向转换及索引查询工具；
 
 ## 设计约束
-- `models.py` 定义数据模型。
-- `feibi_rules.py` 负责音节和菲比规则。
-- `adapters.py` 负责外部工具调用边界。
-- `pipeline.py` 是唯一的流程编排入口。
-- LLM 输出必须经过本地规则校验。
-
-## 外部能力
-真实运行需要用户提供 ASR、分离工具、ACE-Step 1.5、RVC 和菲比模型路径。
+- pipeline.py 只负责流程编排，不直接实现外部模型推理；
+- 所有外部模型和命令必须通过 adapters.py 接入，禁止在业务代码中拼接 shell 命令；
+- LLM 生成的候选歌词必须先通过 feibi_rules.py 的音节数、模式和结尾规则校验，校验失败时不得进入 ACE-Step 阶段；
+- 每个阶段必须产生明确状态； dry-run 只能生成计划文件和报告，不得伪装成已生成音频；
+- 音节计数当前采用可解释的启发式实现；专业语言音节计数器可作为后续替换适配器接入；
+- 真实运行依赖用户提供分离工具、ASR、ACE-Step 1.5、RVC 及菲比模型路径，仓库不提交模型权重和用户音频；
+- Markdown 上下文文件必须通过 harness/harness_context.py 从 JSON 生成或转换，不能直接编辑固定格式 Markdown；
