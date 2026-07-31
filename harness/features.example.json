@@ -1,0 +1,28 @@
+﻿{
+  "rules": [
+    "每次只激活一个功能项；",
+    "功能状态通常包括：`not_started`、`in_progress`、`blocked` 和 `passing`。同一时间只能有一个功能处于 `in_progress` 状态。功能只有在验证命令通过并留下证据后，才能标记为 `passing`。",
+    "功能状态应根据验证结果更新，不能仅凭主观判断标记完成。"
+  ],
+  "features": [
+    {
+      "id": "F03",
+      "title": "购物车添加商品",
+      "keywords": ["购物车"],
+      "date": "2026-04-29",
+      "priority": 3,
+      "area": "cart",
+      "user_visible_behavior": "用户提交商品 ID 和数量后，系统成功将商品加入购物车，并返回创建成功结果",
+      "status": "passing",
+      "verification_steps": [
+        "启动应用",
+        "调用 `POST /api/cart/items`",
+        "传入 `product_id` 和 `quantity`",
+        "确认接口返回 `201`",
+        "运行相关测试"
+      ],
+      "verification_evidence": "commit `abc123`，测试输出已记录",
+      "notes": "功能项的粒度应控制在一次会话能够完成和验证的范围内"
+    }
+  ]
+}

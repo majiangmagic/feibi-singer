@@ -1,22 +1,39 @@
 # FEATURES.md
 
 ## 功能清单规则
-- 同一时间只激活一个 `in_progress` 功能。
-- 只有三层验证全部通过才能标记 `passing`。
 
-## F001：可验证的 dry-run 流水线骨架
+- 每次只激活一个功能项；
+- 功能状态包括：`not_started`、`in_progress`、`blocked` 和 `passing`。同一时间只能有一个功能处于 `in_progress` 状态。功能只有在验证命令通过并留下证据后，才能标记为 `passing`。
+- 功能状态根据单元、集成和端到端验证结果更新，不能仅凭代码或文档已经写完就标记完成。
+
+## F01：菲比演唱 dry-run 流水线
+
+- 索引：流水线, 歌词改写, dry-run, ACE-Step, RVC
+- 日期：2026-07-31
 - 优先级：1
+- 所属区域：`pipeline`
+- 用户可见行为：用户提供歌曲和可选歌词后，可以运行 dry-run，获得符合菲比规则的改写歌词、规则校验、四个外部阶段计划和最终报告。。
 - 状态：`passing`
-- 验证证据：`pytest -q` 输出 4 passed；CLI dry-run 输出 `all_passed: true`。
+- 验证步骤：
+  1. 运行规则单元测试；
+  2. 运行流水线集成测试；
+  3. 通过 scripts/feibi_pipeline.py 执行 CLI dry-run；
+  4. 检查生成的歌词、校验文件、阶段计划和报告。
+- 验证证据：2026-07-31 验证：tests/test_rules.py 3 passed；tests/test_pipeline.py 1 passed；CLI dry-run 成功生成 4 个阶段计划、rewritten_lyrics.txt、validation.json 和 report.json。。
+- 备注：真实模型推理仍依赖用户配置外部工具和模型文件；当前完成定义覆盖可重复验证的 dry-run 流程。。
 
-## F002：真实音频分离和多语言 ASR 接入
-- 优先级：2
-- 状态：`not_started`
+## F02：统一重生成 Harness Markdown 上下文文档
 
-## F003：ACE-Step 1.5 歌词修改接入
+- 索引：Harness, Markdown, ARCHITECTURE, PROGRESS, FEATURES, DECISIONS
+- 日期：2026-07-31
 - 优先级：2
-- 状态：`not_started`
-
-## F004：RVC 菲比音色转换接入
-- 优先级：2
-- 状态：`not_started`
+- 所属区域：`documentation`
+- 用户可见行为：项目维护者可以使用 harness_context.py 从 JSON 生成全部固定格式上下文文档，并能回读、搜索和查询最新记录。。
+- 状态：`passing`
+- 验证步骤：
+  1. 从规范 JSON 生成两份 ARCHITECTURE.md、PROGRESS.md、FEATURES.md 和 DECISIONS.md；
+  2. 对每份生成结果执行 md-to-json 回读；
+  3. 比较回读 JSON 与源 JSON；
+  4. 验证 FEATURES.md 和 DECISIONS.md 的 search 与 latest 查询。
+- 验证证据：2026-07-31 验证：5 份目标 Markdown 均由 harness_context.py 从 UTF-8 JSON 生成；全部 md-to-json 回读与源 JSON 完全一致；FEATURES/DECISIONS 的 search 与 latest 查询通过；git diff --check 通过。。
+- 备注：AGENT.md 保留用户手工确认版本；.pytest_cache/README.md 不属于项目维护文档。。

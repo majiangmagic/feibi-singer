@@ -1,0 +1,14 @@
+﻿{
+  "decisions": [
+    {
+      "title": "使用 PostgreSQL 保存用户数据",
+      "keywords": ["PostgreSQL"],
+      "date": "2026-04-29",
+      "status": "已采用",
+      "decision": "用户数据统一存储在 PostgreSQL 中。",
+      "reason": "项目需要支持事务、数据约束和可靠的关系查询，PostgreSQL 能够满足当前业务需求。",
+      "rejected_alternative": "不使用 SQLite 作为生产数据库，因为它不适合当前的并发访问和生产部署场景。",
+      "impact": "用户管理模块的 Repository 层必须通过 PostgreSQL 访问数据，测试环境需要提供对应的数据库实例。"
+    }
+  ]
+}

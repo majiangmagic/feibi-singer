@@ -1,10 +1,21 @@
 # DECISIONS.md
 
-## D001：采用可插拔命令适配器
-- 日期：2026-07-31
-- 决策：使用配置中的命令模板连接外部模型。
-- 原因：不同环境的版本和路径差异很大。
+## 通过外部适配器接入音频模型和命令
 
-## D002：本地硬校验菲比歌词
+- 索引：外部适配器, Demucs, Whisper, ACE-Step, RVC
 - 日期：2026-07-31
-- 决策：LLM 只创作候选歌词，音节和模式由本地规则校验。
+- 状态：已采用
+- 决策：分离、ASR、ACE-Step 和 RVC 均通过 feibi_singer/adapters.py 的统一边界接入，pipeline.py 只负责编排。
+- 原因：外部工具的安装方式、命令参数和运行环境差异较大，隔离适配器可以保持业务流程可测试，并允许 dry-run 在没有模型时生成可靠计划。
+- 放弃方案：不在 pipeline.py 或命令行入口中直接拼接并执行各模型命令，因为这会把外部环境细节耦合进业务流程。
+- 影响：新增或替换模型时必须扩展适配器和配置；业务代码只消费统一的阶段结果，测试可使用 dry-run 验证阶段顺序和工件。
+
+## Harness Markdown 统一由 JSON 生成
+
+- 索引：Harness, Markdown, JSON, harness_context.py
+- 日期：2026-07-31
+- 状态：已采用
+- 决策：ARCHITECTURE.md、PROGRESS.md、FEATURES.md 和 DECISIONS.md 必须先构造 JSON，再通过 harness/harness_context.py 生成；读取和索引也通过该脚本完成。
+- 原因：固定格式文档需要稳定章节、字段和标点，结构化 JSON 加统一处理器可以避免手工编辑造成格式漂移，并支持机器校验。
+- 放弃方案：不继续直接手工维护固定格式 Markdown，因为现有文档已经与新处理器格式不兼容，无法可靠解析。
+- 影响：每次文档变更都要执行 JSON 到 Markdown 生成、Markdown 到 JSON 回读和结构化比较；FEATURES.md 与 DECISIONS.md 通过 keywords、search 和 latest 查询。
