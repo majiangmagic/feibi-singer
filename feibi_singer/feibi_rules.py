@@ -13,13 +13,13 @@ QIAN = chr(0x94B1)
 TOKENS = (FEI, BI, JIU, BA, FEN, QIAN)
 
 PATTERN_LABELS: tuple[tuple[str, str], ...] = (
-    ("菲+比+啾+比", rf"^{FEI}+{BI}+{JIU}+{BI}+$"),
-    ("菲+比+啾+", rf"^{FEI}+{BI}+{JIU}+$"),
-    ("菲+比+", rf"^{FEI}+{BI}+$"),
-    ("菲+八啾+比", rf"^{FEI}+{BA}+{JIU}+{BI}+$"),
-    ("菲+八+", rf"^{FEI}+{BA}+$"),
-    ("菲八分钱", rf"^{FEI}{BA}{FEN}{QIAN}$"),
-    ("菲", rf"^{FEI}$"),
+    ("????", rf"^{FEI}+{BI}+{JIU}+{BI}+$"),
+    ("???", rf"^{FEI}+{BI}+{JIU}+$"),
+    ("??", rf"^{FEI}+{BI}+$"),
+    ("????", rf"^{FEI}+{BA}+{JIU}+{BI}+$"),
+    ("??", rf"^{FEI}+{BA}+$"),
+    ("????", rf"^{FEI}{BA}{FEN}{QIAN}$"),
+    ("?", rf"^{FEI}$"),
 )
 
 
@@ -31,16 +31,39 @@ class LineCheck:
     pattern: str
     reasons: tuple[str, ...] = ()
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "source_syllables": self.source_syllables,
+            "rewritten_syllables": self.rewritten_syllables,
+            "accepted": self.accepted,
+            "pattern": self.pattern,
+            "reasons": list(self.reasons),
+        }
+
+
+def _is_cjk_like(ch: str) -> bool:
+    code = ord(ch)
+    return (
+        0x4E00 <= code <= 0x9FFF
+        or 0x3400 <= code <= 0x4DBF
+        or 0x3040 <= code <= 0x30FF
+        or 0x31F0 <= code <= 0x31FF
+        or 0xAC00 <= code <= 0xD7AF
+    )
+
 
 def syllable_count(text: str) -> int:
     count = 0
-    for word in re.findall(r"[A-Za-z]+|[぀-ヿ]|[一-鿿]|\d+", text):
-        if re.fullmatch(r"[぀-ヿ]|[一-鿿]", word):
-            count += len(word)
-        elif word.isdigit():
-            count += len(word)
-        else:
-            count += max(1, len(re.findall(r"[aeiouy]+", word.lower())))
+    latin_chunks = re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?|\d+", text)
+    for ch in text:
+        if _is_cjk_like(ch):
+            count += 1
+    for chunk in latin_chunks:
+        if chunk.isdigit():
+            count += len(chunk)
+            continue
+        groups = re.findall(r"[aeiouy]+", chunk.lower())
+        count += max(1, len(groups))
     return count
 
 
@@ -83,11 +106,9 @@ def make_feibi_line(source: str, index: int = 0) -> str:
     if syllables == 1:
         return FEI
     if syllables == 2:
-        return FEI + BI
+        return FEI + (BI if index % 2 == 0 else BA)
     if syllables == 3:
-        return FEI + BI + JIU
-    if syllables == 4:
-        return (FEI + BI + JIU + BI) if index % 2 == 0 else (FEI + BA + FEN + QIAN)
+        return (FEI + BI + JIU) if index % 2 == 0 else (FEI + BA + BA)
     if index % 2 == 0:
         return FEI + BI + (JIU * (syllables - 3)) + BI
     return FEI + BA + (JIU * (syllables - 3)) + BI

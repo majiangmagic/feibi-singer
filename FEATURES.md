@@ -52,3 +52,18 @@
   3. 确认 validate_line 能拦截不符合规则的歌词。
 - 验证证据：2026-07-31 tests/test_rules.py 4 passed; Feibi lyric rule tests cover multilingual syllable counting and rewrite validation.。
 - 备注：目前规则层只负责歌词改写与验证，还未接入 ASR、LLM、ACE-Step 1.5 和 RVC。。
+
+## F04：端到端菲比演唱器管线骨架
+
+- 索引：pipeline, ASR, LLM, ACE-Step, RVC
+- 日期：2026-07-31
+- 优先级：1
+- 所属区域：`pipeline`
+- 用户可见行为：用户输入一段音乐后，系统能够按固定顺序整理出分离、人声识别、歌词改写、ACE-Step 生成和 RVC 变声所需的阶段工件，作为后续接入真实模型的端到端骨架。。
+- 状态：`passing`
+- 验证步骤：
+  1. 运行新的管线骨架单元测试；
+  2. 检查 dry-run 生成的阶段计划和工件目录；
+  3. 确认输入清单、歌词改写输出与 stage 计划文件均被写入。
+- 验证证据：2026-07-31 pytest -q 4 passed; python -m compileall feibi_singer scripts tests ???????? input_manifest.json?rewritten_lyrics.json?validation.json?stages/*/stage.json?report.json?。
+- 备注：????????????????? ASR?LLM?ACE-Step 1.5 ? RVC ????????????。

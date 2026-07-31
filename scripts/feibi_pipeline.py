@@ -1,17 +1,34 @@
-import argparse, json
-from pathlib import Path
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
 import sys
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from feibi_singer.models import PipelineConfig
 from feibi_singer.pipeline import FeibiPipeline
 
-def main():
- p=argparse.ArgumentParser(description="??????????? dry-run?")
- p.add_argument("--input",required=True,type=Path); p.add_argument("--output-dir",required=True,type=Path); p.add_argument("--lyrics",type=Path); p.add_argument("--config",type=Path); p.add_argument("--dry-run",action="store_true")
- a=p.parse_args(); cfg=PipelineConfig()
- if a.config: cfg=PipelineConfig(**json.loads(a.config.read_text(encoding="utf-8-sig")))
- lines=a.lyrics.read_text(encoding="utf-8").splitlines() if a.lyrics else []
- report=FeibiPipeline(cfg,dry_run=a.dry_run).run(a.input,a.output_dir,lines)
- print(json.dumps(report.as_dict(),ensure_ascii=False,indent=2))
- return 0
-if __name__=="__main__": raise SystemExit(main())
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Feibi singer pipeline skeleton")
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--lyrics", type=Path)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    cfg = PipelineConfig()
+    if args.config:
+        cfg = PipelineConfig(**json.loads(args.config.read_text(encoding="utf-8-sig")))
+    lines = args.lyrics.read_text(encoding="utf-8").splitlines() if args.lyrics else []
+    report = FeibiPipeline(cfg, dry_run=args.dry_run).run(args.input, args.output_dir, lines)
+    print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
