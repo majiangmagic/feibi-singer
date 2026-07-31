@@ -6,64 +6,310 @@
 - 功能状态通常包括：`not_started`、`in_progress`、`blocked` 和 `passing`。同一时间只能有一个功能处于 `in_progress` 状态。功能只有在验证命令通过并留下证据后，才能标记为 `passing`。
 - 功能状态应根据验证结果更新，不能仅凭主观判断标记完成。
 
-## F01：菲比 dry-run 流水线
+## F01：干运行五阶段流水线
 
-- 索引：流水线, 歌词改写, dry-run, ACE-Step, RVC
+- 索引：dry-run, 流水线, 阶段计划, CLI
 - 日期：2026-07-31
 - 优先级：1
-- 所属区域：`流水线`
-- 用户可见行为：用户提供歌曲并可选提供歌词后，可以执行 dry-run，得到符合菲比规则的改写歌词、验证结果、四个外部阶段计划以及最终报告；当没有歌词时，ASR 只作为备选输入。。
+- 所属区域：`核心流程`
+- 用户可见行为：用户无需安装真实外部引擎即可预览五阶段执行顺序、输入输出和歌词改写结果。。
 - 状态：`passing`
 - 验证步骤：
-  1. 运行规则单元测试；
-  2. 运行流水线集成测试；
-  3. 通过 scripts/feibi_pipeline.py 执行 CLI dry-run；
-  4. 检查生成的歌词、验证文件、阶段计划和报告。
-- 验证证据：2026-07-31 python -m compileall feibi_singer scripts tests；pytest -q 通过 6 项测试；CLI dry-run 写出了 input_manifest.json、rewritten_lyrics.json、validation.json、stages/*/stage.json 和 report.json。。
-- 备注：真实模型推理仍依赖用户配置的外部工具和模型文件；当前定义覆盖的是可重复的 dry-run 流程。。
+  1. 运行流水线测试。；
+  2. 使用带歌词输入执行 CLI dry-run。；
+  3. 确认阶段状态为 planned 或 skipped。。
+- 验证证据：tests/test_pipeline.py 覆盖五阶段 dry-run；本轮 CLI dry-run 得到 planned、skipped、planned、planned、planned。。
+- 备注：dry-run 不生成或伪造真实音频。。
 
-## F02：统一的 Harness Markdown 重新生成
+## F02：Harness 文档转换与状态同步
 
-- 索引：Harness, Markdown, ARCHITECTURE, PROGRESS, FEATURES, DECISIONS
+- 索引：Harness, JSON, Markdown, round-trip, 中文
 - 日期：2026-07-31
-- 优先级：2
+- 优先级：1
 - 所属区域：`文档`
-- 用户可见行为：维护者可以使用 harness_context.py 从 JSON 生成所有固定格式上下文文档，并且可以做 round-trip、搜索和最新记录查询。。
+- 用户可见行为：四份项目文档由结构化 JSON 生成并可回读，中文内容和代码状态能够持续同步。。
 - 状态：`passing`
 - 验证步骤：
-  1. 从策略 JSON 生成 ARCHITECTURE.md、PROGRESS.md、FEATURES.md 和 DECISIONS.md；
-  2. 对每个生成的文件执行 md-to-json round-trip；
-  3. 将 round-tripped 的 JSON 与源 JSON 对比；
-  4. 验证 FEATURES.md 和 DECISIONS.md 的搜索与 latest 查询。
-- 验证证据：2026-07-31 已验证：所有目标 Markdown 文件都由 UTF-8 JSON 通过 harness_context.py 生成；md-to-json round-trip 与源 JSON 一致；FEATURES/DECISIONS 的 search 和 latest 查询通过；git diff --check 通过。。
-- 备注：AGENT.md 保持用户确认版本；.pytest_cache/README.md 不属于项目维护文档。。
+  1. 从 JSON 生成四份 Markdown。；
+  2. 将四份 Markdown 回读为 JSON。；
+  3. 比较源 JSON 和回读 JSON。；
+  4. 运行索引查询和 harness/check.py。。
+- 验证证据：四份文档 round-trip 结构一致，FEATURES latest、DECISIONS search 和 harness/check.py 已通过。。
+- 备注：固定格式 Markdown 不直接手工编辑。。
 
-## F03：菲比规则层
+## F03：用户歌词优先策略
 
-- 索引：歌词规则, 多语言, 音节计数, 歌词改写, 菲比
+- 索引：歌词来源, 用户歌词, ASR, 优先级
 - 日期：2026-07-31
 - 优先级：1
-- 所属区域：`歌词`
-- 用户可见行为：当用户提供音乐和可选歌词时，系统可以在保持音节数不变并尽量贴近原旋律感受的前提下，按菲比规则改写歌词。。
+- 所属区域：`歌词来源`
+- 用户可见行为：用户提供歌词时系统直接使用该歌词，并明确跳过 ASR。。
 - 状态：`passing`
 - 验证步骤：
-  1. 运行 tests/test_rules.py；
-  2. 验证多语言音节计数和菲比改写行为；
-  3. 确认 validate_line 会阻止不符合规则的歌词。
-- 验证证据：2026-07-31 tests/test_rules.py 通过 4 项测试；菲比歌词规则测试覆盖了多语言音节计数和改写验证。。
-- 备注：当前规则层只处理歌词改写和验证，还没有接入 ASR、LLM、ACE-Step 1.5 或 RVC。。
+  1. 运行带歌词 dry-run。；
+  2. 确认 lyric_source 为 user_provided。；
+  3. 确认 ASR 阶段为 skipped 且原因是 user_lyrics_provided。。
+- 验证证据：test_dry_run_skips_asr_when_user_lyrics_exist 已通过。。
+- 备注：避免歌曲 ASR 误差污染歌词改写。。
 
-## F04：端到端菲比流水线骨架
+## F04：版本化五阶段执行协议
 
-- 索引：流水线, ASR, LLM, ACE-Step, RVC
+- 索引：PipelineProtocol, StageContract, 协议, 阶段顺序
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`集成协议`
+- 用户可见行为：每个外部阶段具有固定名称、顺序、用途、输入输出、必需字段和命令占位符。。
+- 状态：`passing`
+- 验证步骤：
+  1. 构建 PipelineProtocol。；
+  2. 检查五个 StageContract。；
+  3. 确认 protocol.json 写入运行目录。。
+- 验证证据：test_pipeline_protocol_exposes_command_templates 已通过，dry-run 已生成 feibi.pipeline.v1 的 protocol.json。。
+- 备注：阶段顺序为 separation、asr、lyric_rewrite、ace_step_lyric_edit、rvc_voice_conversion。。
+
+## F05：真实音频端到端执行
+
+- 索引：真实执行, 分离, ASR, LLM, ACE-Step, RVC, 端到端
 - 日期：2026-07-31
 - 优先级：1
-- 所属区域：`流水线`
-- 用户可见行为：用户输入歌曲后，系统可以按固定顺序组织分离、ASR、歌词改写、ACE-Step 生成和 RVC 转换的产物，作为未来真实模型集成的骨架。。
+- 所属区域：`端到端`
+- 用户可见行为：用户提交真实歌曲后可以得到经过分离、歌词获取与改写、歌曲生成和菲比音色转换的最终音频。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 配置所有真实外部引擎和凭据。；
+  2. 依次完成单元测试和集成测试。；
+  3. 使用真实音频执行完整流水线。；
+  4. 试听并检查 final_feibi_song.wav。。
+- 验证证据：目前只有 dry-run 和桥接代码证据，没有真实音频全链路通过记录。。
+- 备注：被外部引擎配置、LLM 凭据和运行时依赖阻塞。。
+
+## F06：菲比歌词音节和模式校验
+
+- 索引：歌词规则, 音节, 多语言, 菲比模式, 校验
+- 日期：2026-07-31
+- 优先级：1
+- 所属区域：`歌词规则`
+- 用户可见行为：系统能按中英日韩混合文本的启发式音节数生成和检查菲比歌词，并拒绝音节或模式不匹配的行。。
 - 状态：`passing`
 - 验证步骤：
-  1. 运行新的流水线骨架单元测试；
-  2. 在 dry-run 中检查生成的阶段计划和产物目录；
-  3. 确认输入清单、歌词改写输出和阶段计划文件都会被写出。
-- 验证证据：2026-07-31 流水线骨架测试通过；dry-run 会写出按阶段组织的 artifact、report 和歌词验证文件。。
-- 备注：这个骨架已经把“分离→ASR 备选→歌词改写→ACE-Step→RVC”的顺序固定下来，但真正音频推理仍待外部工具接入。。
+  1. 运行 tests/test_rules.py。；
+  2. 验证中文、英文和日文音节统计。；
+  3. 验证模式和音节错误会被拒绝。。
+- 验证证据：tests/test_rules.py 的多语言音节、模式识别和改写校验均通过。。
+- 备注：音节统计是可替换的启发式实现。。
+
+## F07：CLI 输入、歌词和配置入口
+
+- 索引：CLI, input, lyrics, config, no-asr-fallback
+- 日期：2026-07-31
+- 优先级：1
+- 所属区域：`命令行`
+- 用户可见行为：用户可以从命令行指定音频、输出目录、可选歌词、JSON 配置、dry-run 和是否禁用 ASR 回退。。
+- 状态：`passing`
+- 验证步骤：
+  1. 运行 scripts/feibi_pipeline.py --help。；
+  2. 使用 input、lyrics、output-dir 和 dry-run 执行命令。；
+  3. 确认输出 JSON 报告。。
+- 验证证据：本轮 CLI dry-run 成功读取音频和歌词并生成 report.json。。
+- 备注：真实运行需要额外传入完整配置。。
+
+## F08：ASR 回退开关和空歌词处理
+
+- 索引：ASR, fallback, no-asr-fallback, 空歌词, skipped
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`歌词来源`
+- 用户可见行为：未提供歌词时用户可以启用 ASR，也可以显式关闭回退并获得可观测的 skipped 状态。。
+- 状态：`passing`
+- 验证步骤：
+  1. 无歌词且关闭回退执行 dry-run。；
+  2. 确认 lyric_source 为 empty。；
+  3. 确认 ASR 原因为 fallback_disabled。。
+- 验证证据：test_dry_run_can_disable_asr_fallback 已通过。。
+- 备注：真实运行在没有任何歌词来源时会阻止歌词改写。。
+
+## F09：运行清单和阶段可观测性
+
+- 索引：manifest, request.json, stage.json, stdout, stderr, 日志
+- 日期：2026-07-31
+- 优先级：1
+- 所属区域：`可观测性`
+- 用户可见行为：每次运行保存输入清单、协议、阶段请求、阶段状态、解析后命令以及标准输出和错误日志。。
+- 状态：`passing`
+- 验证步骤：
+  1. 执行 dry-run 并检查 manifest、protocol 和五个 stage.json。；
+  2. 检查真实执行路径会写 stdout.log 和 stderr.log。；
+  3. 确认 StageResult 保存状态和错误详情。。
+- 验证证据：test_pipeline.py 已检查核心阶段文件；ExternalAdapter 实现 request、stage、stdout、stderr 和 resolved_command 落盘。。
+- 备注：真实 stdout 和 stderr 需在配置引擎后验证内容。。
+
+## F10：真实人声和伴奏分离
+
+- 索引：audio-separator, separation, vocals, instrumental, stem
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`音频分离`
+- 用户可见行为：系统使用 audio-separator 将输入歌曲拆分为标准 vocals.wav 和 instrumental.wav。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 配置 separation_backend_command。；
+  2. 安装 audio-separator 和分离模型。；
+  3. 使用真实歌曲执行分离。；
+  4. 确认两个 stem 可播放且路径正确。。
+- 验证证据：scripts/feibi_separate_audio_separator.py 已实现命令和 stem 查找，但 config.example.json 尚未配置 separation_backend_command，也没有真实分离记录。。
+- 备注：代码桥接存在，真实功能未验收。。
+
+## F11：faster-whisper 多语种转写
+
+- 索引：faster-whisper, ASR, transcript, language, segments
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`语音识别`
+- 用户可见行为：没有用户歌词时，系统对分离后的人声轨进行多语种识别并输出带时间段的 JSON 和纯文本歌词。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 安装 faster-whisper。；
+  2. 配置 asr_engine_command。；
+  3. 对真实人声轨执行识别。；
+  4. 检查 transcript.json、transcript.txt、语言和 segments。。
+- 验证证据：ASR backend 和 faster-whisper engine 脚本已实现，但示例配置未填写 asr_engine_command，真实转写未验证。。
+- 备注：支持 model、device、compute type、beam size 和 language 参数。。
+
+## F12：CloudMist 菲比歌词改写
+
+- 索引：CloudMist, OpenAI-compatible, LLM, 歌词改写, API Key
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`歌词生成`
+- 用户可见行为：系统调用 OpenAI-compatible API，按输入行数、音节和菲比模式要求生成改写歌词。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 配置 CLOUDMIST_API_KEY 或 OPENAI_API_KEY。；
+  2. 提交多语言歌词。；
+  3. 检查 llm_request.json 和 llm_response.json。；
+  4. 确认 rewritten_lines 行数匹配并通过本地校验。。
+- 验证证据：scripts/feibi_llm_cloudmist.py 已实现提示词、请求、JSON 提取和行数规范化，但缺少有效 API Key 和真实请求证据。。
+- 备注：默认 API base 为 CloudMist，默认模型为 gpt-4o。。
+
+## F13：ACE-Step 1.5 仅改词生成
+
+- 索引：ACE-Step, lyric_edit, cover, HTTP API, 歌曲生成
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`歌曲生成`
+- 用户可见行为：系统将伴奏和已校验歌词送入 ACE-Step，仅改歌词并生成新的歌曲音频。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 配置 ace_step_engine_command。；
+  2. 启动官方 ACE-Step API 或配置本地模块命令。；
+  3. 提交伴奏和改写歌词。；
+  4. 确认 ace_step_output.wav 存在且可播放。。
+- 验证证据：ACE-Step backend 和 official bridge 已实现 HTTP/API 及本地命令分支，但没有可用 engine 配置和真实输出。。
+- 备注：桥接失败时明确报错，不再静默生成占位音频。。
+
+## F14：RVC 菲比音色转换
+
+- 索引：RVC, rvc_infer, pth, index, 音色转换
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`音色转换`
+- 用户可见行为：系统使用仓库内菲比 .pth 权重和 .index 索引，把 ACE-Step 输出转换为 final_feibi_song.wav。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 配置 rvc_engine_command。；
+  2. 确认模型和索引路径存在。；
+  3. 安装并修复 rvc_infer runtime。；
+  4. 执行转换并试听最终音频。。
+- 验证证据：仓库已有模型和索引，路径存在性测试通过，RVC backend 和 engine 脚本已实现；真实 runtime 和推理尚未验证。。
+- 备注：模型文件约 57.6 MB，索引约 9.9 MB。。
+
+## F15：真实执行前配置和模型校验
+
+- 索引：PipelineConfig, 配置校验, 命令校验, RVC 路径, fail-fast
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`配置`
+- 用户可见行为：真实运行开始前系统检查必需 wrapper、backend、engine 命令以及 RVC 模型和索引，缺失时立即报告。。
+- 状态：`passing`
+- 验证步骤：
+  1. 使用空 PipelineConfig 请求真实执行校验。；
+  2. 确认缺失命令产生 ValueError。；
+  3. 使用不存在的 RVC 路径并确认 FileNotFoundError。。
+- 验证证据：test_pipeline_config_validation_for_real_run 和 test_pipeline_config_checks_rvc_paths 已通过。。
+- 备注：示例配置仍需用户补齐 engine 命令才能通过真实执行校验。。
+
+## F16：外部命令模板和环境变量传递
+
+- 索引：占位符, 环境变量, FEIBI_, backend, engine, repo_root
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`集成协议`
+- 用户可见行为：外部工具通过稳定占位符和 FEIBI_* 环境变量获得运行目录、阶段目录、请求、输入、输出、配置和下层命令。。
+- 状态：`passing`
+- 验证步骤：
+  1. 检查命令模板多轮解析。；
+  2. 检查 FEIBI_STAGE、RUN_DIR、REQUEST_JSON、INPUTS_JSON 和 OUTPUTS_JSON。；
+  3. 检查 backend 和 engine 命令按阶段传递。。
+- 验证证据：models.py 定义协议环境变量，adapters.py 实现模板渲染和环境注入，协议占位符测试通过。。
+- 备注：实际 engine 命令由部署环境配置。。
+
+## F17：外部命令失败和缺产物检测
+
+- 索引：returncode, missing_outputs, 失败, 日志, StageResult
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`错误处理`
+- 用户可见行为：外部命令返回非零或没有写出声明产物时，阶段被标记 failed 并保留原因和日志，真实流水线停止。。
+- 状态：`passing`
+- 验证步骤：
+  1. 检查 ExternalAdapter 的返回码处理。；
+  2. 检查声明输出存在性检查。；
+  3. 检查 pipeline 对必需阶段调用 _require_stage_ok。。
+- 验证证据：ExternalAdapter 已实现 command_failed 和 missing_outputs，external.py 各 wrapper 也检查 backend 返回码与产物；compileall 通过。。
+- 备注：后续应增加真实失败命令的集成测试。。
+
+## F18：歌词改写输出规范化
+
+- 索引：rewritten_lines, JSON, 行数, 规范化, validation
+- 日期：2026-08-01
+- 优先级：2
+- 所属区域：`歌词生成`
+- 用户可见行为：LLM 返回代码块、嵌套 JSON、过多或不足行时，系统尝试提取并调整为与源歌词相同的行数。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 模拟纯 JSON、Markdown 代码块和混合文本响应。；
+  2. 覆盖输出行数过多和不足。；
+  3. 确认规范化结果仍经过本地歌词校验。。
+- 验证证据：scripts/feibi_llm_cloudmist.py 已实现 _extract_json 和 _normalize_output，但当前没有对应自动化测试或真实 API 验证。。
+- 备注：代码存在不等于功能已验收。。
+
+## F19：统一结果汇总和最终产物索引
+
+- 索引：PipelineReport, report.json, outputs, validation, final_song
+- 日期：2026-07-31
+- 优先级：1
+- 所属区域：`结果汇总`
+- 用户可见行为：运行结束后用户获得 report.json，其中包含清单、阶段状态、源歌词、改写歌词、校验结果和所有关键产物路径。。
+- 状态：`passing`
+- 验证步骤：
+  1. 执行 dry-run。；
+  2. 读取 report.json。；
+  3. 确认 stages、source_lyrics、rewritten_lyrics、validation 和 outputs 字段。。
+- 验证证据：test_dry_run_prefers_user_lyrics 验证 report.json 和关键产物，CLI dry-run 已再次生成统一报告。。
+- 备注：真实 final_song 路径会提前列出，但只有真实 RVC 成功后文件才存在。。
+
+## F20：可直接运行的真实配置模板
+
+- 索引：config.example.json, separation_backend_command, engine_command, 配置模板
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`配置`
+- 用户可见行为：用户可以从示例配置直接看到并填写分离、ASR、LLM、ACE-Step 和 RVC 的完整 wrapper、backend、engine 命令。。
+- 状态：`blocked`
+- 验证步骤：
+  1. 补齐 separation_backend_command。；
+  2. 补齐 asr_engine_command、ace_step_engine_command 和 rvc_engine_command。；
+  3. 使用 PipelineConfig 读取示例。；
+  4. 执行真实配置前置校验。。
+- 验证证据：当前示例包含五个 wrapper 和四个 backend，但缺少 separation_backend_command 以及 ASR、ACE-Step、RVC engine 命令，尚不可直接真实运行。。
+- 备注：LLM backend 直接调用 API，因此通过环境变量提供凭据而不是独立 engine 命令。。

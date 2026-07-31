@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -7,7 +6,7 @@ from pathlib import Path
 
 from .adapters import ExternalAdapter
 from .feibi_rules import rewrite_lyrics, validate_line
-from .models import PipelineConfig, PipelineReport, StageResult
+from .models import PipelineConfig, PipelineProtocol, PipelineReport, StageResult
 
 
 class FeibiPipeline:
@@ -35,6 +34,7 @@ class FeibiPipeline:
         lyrics: list[str],
         lyric_source: str,
         asr_enabled: bool,
+        protocol: PipelineProtocol,
     ) -> dict:
         return {
             "input_audio": str(input_audio),
@@ -43,6 +43,7 @@ class FeibiPipeline:
             "lyrics_provided": bool(lyrics),
             "lyrics_line_count": len(lyrics),
             "asr_enabled": asr_enabled,
+            "protocol_version": protocol.version,
             "config": self.config.as_dict(),
             "dry_run": self.dry_run,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -105,38 +106,54 @@ class FeibiPipeline:
         *,
         use_asr_fallback: bool = True,
     ) -> PipelineReport:
-        output_dir.mkdir(parents=True, exist_ok=True)
         user_lyrics = list(lyrics or [])
+        protocol = self.config.build_protocol()
+        require_asr = not user_lyrics and use_asr_fallback
+        if not self.dry_run:
+            self.config.validate(require_commands=True, require_rvc=True, require_asr=require_asr)
+            self.config.ensure_rvc_paths_exist()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        self._write_json(output_dir / "protocol.json", protocol.as_dict())
         lyric_source = self._source_mode(user_lyrics, use_asr_fallback)
-        manifest = self._manifest(input_audio, output_dir, user_lyrics, lyric_source, use_asr_fallback)
+        manifest = self._manifest(input_audio, output_dir, user_lyrics, lyric_source, use_asr_fallback, protocol)
         self._write_json(output_dir / "input_manifest.json", manifest)
 
         adapter = ExternalAdapter(self.config, self.dry_run)
+        protocol_data = protocol.as_dict()
         stages: list[StageResult] = []
         stage_inputs = {
             "input_audio": str(input_audio),
             "user_lyrics": user_lyrics,
             "lyric_source": lyric_source,
             "config": self.config.as_dict(),
+            "protocol_version": protocol.version,
         }
 
+        separation_outputs = {
+            "vocals": str(output_dir / "stages" / "separation" / "vocals.wav"),
+            "instrumental": str(output_dir / "stages" / "separation" / "instrumental.wav"),
+        }
         separation = adapter.run(
             "separation",
             self.config.separation_command,
             output_dir,
             stage_inputs,
-            {
-                "vocals": str(output_dir / "stages" / "separation" / "vocals.wav"),
-                "instrumental": str(output_dir / "stages" / "separation" / "instrumental.wav"),
-            },
+            separation_outputs,
+            protocol.stages["separation"],
+            protocol_data,
         )
         stages.append(separation)
         self._require_stage_ok(separation, required=not self.dry_run, stage_name="separation")
+        vocals_audio = separation_outputs["vocals"]
+        instrumental_audio = separation_outputs["instrumental"]
 
-        asr_required = not user_lyrics
         asr_stage: StageResult | None = None
         asr_transcript_lines: list[str] = []
-        if user_lyrics or use_asr_fallback:
+        if user_lyrics:
+            asr_artifact = output_dir / "stages" / "asr" / "stage.json"
+            self._write_json(asr_artifact, {"stage": "asr", "skipped": True, "reason": "user_lyrics_provided"})
+            stages.append(StageResult("asr", "skipped", asr_artifact, {"reason": "user_lyrics_provided"}))
+        elif use_asr_fallback:
             asr_stage = adapter.run(
                 "asr",
                 self.config.asr_command,
@@ -144,24 +161,28 @@ class FeibiPipeline:
                 {
                     **stage_inputs,
                     "language": self.config.language,
-                    "role": "fallback" if user_lyrics else "primary",
+                    "role": "primary",
+                    "source_audio": vocals_audio,
+                    "vocals_audio": vocals_audio,
+                    "instrumental_audio": instrumental_audio,
+                    "asr_backend_command": self.config.asr_backend_command,
+                    "asr_engine_command": self.config.asr_engine_command,
                 },
                 {
                     "transcript_json": str(output_dir / "stages" / "asr" / "transcript.json"),
                     "transcript_txt": str(output_dir / "stages" / "asr" / "transcript.txt"),
                 },
+                protocol.stages["asr"],
+                protocol_data,
             )
             stages.append(asr_stage)
-            self._require_stage_ok(asr_stage, required=asr_required and not self.dry_run, stage_name="asr")
+            self._require_stage_ok(asr_stage, required=not self.dry_run, stage_name="asr")
             if asr_stage.status == "completed":
                 asr_transcript_lines = self._read_transcript_lines(output_dir)
         else:
             asr_artifact = output_dir / "stages" / "asr" / "stage.json"
-            self._write_json(
-                asr_artifact,
-                {"stage": "asr", "skipped": True, "reason": "lyrics_provided_and_fallback_disabled"},
-            )
-            stages.append(StageResult("asr", "skipped", asr_artifact, {"reason": "lyrics_provided_and_fallback_disabled"}))
+            self._write_json(asr_artifact, {"stage": "asr", "skipped": True, "reason": "fallback_disabled"})
+            stages.append(StageResult("asr", "skipped", asr_artifact, {"reason": "fallback_disabled"}))
 
         rewrite_source_lines = user_lyrics or asr_transcript_lines
         if not rewrite_source_lines and not self.dry_run:
@@ -175,11 +196,17 @@ class FeibiPipeline:
                 **stage_inputs,
                 "rewrite_source_lines": rewrite_source_lines,
                 "asr_transcript_lines": asr_transcript_lines,
+                "source_audio": vocals_audio if asr_transcript_lines else str(input_audio),
+                "vocals_audio": vocals_audio,
+                "instrumental_audio": instrumental_audio,
+                "llm_backend_command": self.config.llm_backend_command,
             },
             {
                 "rewritten_lyrics": str(output_dir / "rewritten_lyrics.txt"),
                 "rewrite_json": str(output_dir / "rewritten_lyrics.json"),
             },
+            protocol.stages["lyric_rewrite"],
+            protocol_data,
         )
         stages.append(rewrite_stage)
         self._require_stage_ok(rewrite_stage, required=not self.dry_run, stage_name="lyric_rewrite")
@@ -200,10 +227,7 @@ class FeibiPipeline:
                     "validation": validation,
                 },
             )
-            (output_dir / "rewritten_lyrics.txt").write_text(
-                "\n".join(rewritten_lines) + ("\n" if rewritten_lines else ""),
-                encoding="utf-8",
-            )
+            (output_dir / "rewritten_lyrics.txt").write_text("\n".join(rewritten_lines) + ("\n" if rewritten_lines else ""), encoding="utf-8")
         else:
             rewritten_lines = self._read_rewritten_lines(output_dir)
             if not rewritten_lines:
@@ -218,15 +242,13 @@ class FeibiPipeline:
                     "validation": validation,
                 },
             )
-            (output_dir / "rewritten_lyrics.txt").write_text(
-                "\n".join(rewritten_lines) + ("\n" if rewritten_lines else ""),
-                encoding="utf-8",
-            )
+            (output_dir / "rewritten_lyrics.txt").write_text("\n".join(rewritten_lines) + ("\n" if rewritten_lines else ""), encoding="utf-8")
 
         if self.dry_run:
             validation = self._build_validation(rewrite_source_lines, rewritten_lines)
         self._write_json(output_dir / "validation.json", validation)
 
+        generated_song = str(output_dir / "stages" / "ace_step_lyric_edit" / "ace_step_output.wav")
         ace_stage = adapter.run(
             "ace_step_lyric_edit",
             self.config.ace_step_command,
@@ -237,8 +259,15 @@ class FeibiPipeline:
                 "rewritten_lines": rewritten_lines,
                 "validation": validation,
                 "mode": "lyric_edit",
+                "source_audio": instrumental_audio,
+                "vocals_audio": vocals_audio,
+                "rewritten_lyrics_path": str(output_dir / "rewritten_lyrics.txt"),
+                "ace_step_backend_command": self.config.ace_step_backend_command,
+                "ace_step_engine_command": self.config.ace_step_engine_command,
             },
-            {"generated_song": str(output_dir / "stages" / "ace_step_lyric_edit" / "ace_step_output.wav")},
+            {"generated_song": generated_song},
+            protocol.stages["ace_step_lyric_edit"],
+            protocol_data,
         )
         stages.append(ace_stage)
         self._require_stage_ok(ace_stage, required=not self.dry_run, stage_name="ace_step_lyric_edit")
@@ -253,14 +282,21 @@ class FeibiPipeline:
                 "rewritten_lines": rewritten_lines,
                 "rvc_model": self.config.rvc_model,
                 "rvc_index": self.config.rvc_index,
+                "source_song": generated_song,
+                "generated_song": generated_song,
+                "rvc_backend_command": self.config.rvc_backend_command,
+                "rvc_engine_command": self.config.rvc_engine_command,
             },
             {"final_song": str(output_dir / "final_feibi_song.wav")},
+            protocol.stages["rvc_voice_conversion"],
+            protocol_data,
         )
         stages.append(rvc_stage)
         self._require_stage_ok(rvc_stage, required=not self.dry_run, stage_name="rvc_voice_conversion")
 
         outputs = {
             "input_manifest": str(output_dir / "input_manifest.json"),
+            "protocol": str(output_dir / "protocol.json"),
             "rewritten_lyrics": str(output_dir / "rewritten_lyrics.txt"),
             "rewritten_lyrics_json": str(output_dir / "rewritten_lyrics.json"),
             "validation": str(output_dir / "validation.json"),

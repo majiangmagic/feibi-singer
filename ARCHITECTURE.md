@@ -1,31 +1,37 @@
 # ARCHITECTURE.md
 
 ## 模块说明
-Feibi Singer is a pluggable local audio pipeline. It accepts a song file and optional lyrics, prefers user-provided lyrics, and falls back to ASR only when lyrics are missing. The pipeline prepares audio, obtains or reads lyrics, rewrites lyrics, generates a new song with ACE-Step 1.5, and converts the vocals with the supplied RVC Feibi voice. The current implementation emphasizes clear stage boundaries, rule validation, and dry-run verification; real models are connected through external adapters and user configuration.
+菲比演唱器是一个可插拔的本地音频流水线。输入歌曲和可选歌词后，流水线先做人声与伴奏分离；用户提供歌词时优先使用用户歌词，否则按配置回退到 ASR；随后通过外部 LLM 改写为菲比风格歌词，校验每行音节数和模式，再调用 ACE-Step 1.5 仅改词模式生成歌曲，最后通过 RVC 转换为菲比音色。当前代码已经完成 dry-run、阶段协议、wrapper/backend/engine 命令分层和真实桥接脚本；真实端到端运行仍依赖外部工具、模型、凭据和有效配置。
 
 ## 目录结构
-- `feibi_singer/models.py`：Defines the PipelineConfig, StageResult, and PipelineReport data structures；
-- `feibi_singer/feibi_rules.py`：Implements heuristic multilingual syllable counting, Feibi pattern generation, and lyric rule checks；
-- `feibi_singer/adapters.py`：Wraps the external boundaries for separation, ASR, ACE-Step, and RVC; dry-run mode only produces stage plans；
-- `feibi_singer/pipeline.py`：The single orchestration entry point for stage order, artifact persistence, and final reporting；
-- `scripts/feibi_pipeline.py`：Command-line entry point that reads input audio, lyrics, and JSON configuration, then starts the pipeline；
-- `tests/test_rules.py`：Unit tests for Feibi rules and multilingual syllable counting；
-- `tests/test_pipeline.py`：Integration tests for the dry-run pipeline；
-- `config.example.json`：Configuration template for external commands, device, language, and RVC model paths；
-- `AGENT.md`：Project-level development constraints, Harness workflow, and verification requirements；
-- `ARCHITECTURE.md`：Project architecture, directory responsibilities, and design constraints；
-- `PROGRESS.md`：Current verification status, completed work, work in progress, and next steps；
-- `FEATURES.md`：Feature list maintained by priority with verification evidence；
-- `DECISIONS.md`：Important technical decisions, reasons, alternatives, and impact；
-- `harness/harness_context.py`：Harness JSON/Markdown conversion and index query tool；
-- `harness/ARCHITECTURE.md`：Harness submodule structure, usage, and constraints；
+- `feibi_singer/models.py`：定义 PipelineConfig、PipelineProtocol、StageContract、StageResult 和 PipelineReport，并声明五个阶段的输入输出、占位符和环境变量协议；
+- `feibi_singer/pipeline.py`：编排分离、歌词选择、ASR、歌词改写、ACE-Step、RVC 和报告汇总，负责写入 manifest、协议、校验和阶段产物；
+- `feibi_singer/adapters.py`：统一处理 dry-run 阶段计划、真实 shell 命令执行、上下文渲染、环境变量注入、日志和输出存在性检查；
+- `feibi_singer/external.py`：wrapper 层阶段入口，读取阶段请求并执行 separation、ASR、LLM、ACE-Step、RVC 的 backend 命令，校验真实输出；
+- `feibi_singer/feibi_rules.py`：实现多语言启发式音节统计、菲比模式生成、逐行音节和结尾模式校验；
+- `scripts/feibi_pipeline.py`：CLI 入口，读取输入音频、可选歌词和 JSON 配置并启动流水线；
+- `scripts/feibi_separate_audio_separator.py`：使用 audio-separator 执行真实人声和伴奏分离并复制标准化输出；
+- `scripts/feibi_asr_backend.py`：ASR backend wrapper，转调配置的 ASR engine 命令并检查 transcript.json 和 transcript.txt；
+- `scripts/feibi_asr_faster_whisper.py`：使用 faster-whisper 的真实 ASR engine，输出多语种转写 JSON 和文本；
+- `scripts/feibi_llm_cloudmist.py`：调用 CloudMist OpenAI-compatible API，根据菲比规则生成与输入行数对应的改写歌词；
+- `scripts/feibi_ace_step_backend.py`：ACE-Step backend wrapper，转调真实 engine 并检查生成音频；
+- `scripts/feibi_ace_step_official.py`：ACE-Step engine bridge，支持配置官方本地命令或 HTTP API，不再静默伪造音频；
+- `scripts/feibi_rvc_backend.py`：RVC backend wrapper，转调真实 engine 并检查最终音频；
+- `scripts/feibi_rvc_infer.py`：使用 rvc_infer 加载仓库内模型和索引并执行真实音色转换；
+- `config.example.json`：提供 wrapper 命令、现有 backend 命令、RVC 模型索引路径、设备和语言模板；真实分离 backend 及 ASR、ACE-Step、RVC engine 命令仍需补齐；
+- `models/rvc/`：仓库内菲比 RVC 模型和检索索引目录；
+- `tests/`：覆盖菲比规则、多语言音节统计、dry-run 阶段产物、歌词优先级和协议配置的测试；
+- `harness/harness_context.py`：四类 Harness 文档的 JSON/Markdown 转换、回读、索引搜索和最新记录查询工具；
+- `harness/check.py`：递归检查四类文档是否存在、是否乱码以及 PROGRESS 各章节条目数量；
 
 ## 设计约束
-- pipeline.py only orchestrates the flow and does not directly implement external model inference；
-- All external models and commands must go through adapters.py; do not build shell commands in business logic；
-- User-provided lyrics have priority over ASR; ASR is only a fallback when lyrics are missing；
-- Candidate lyrics produced by the LLM must pass the Feibi syllable, pattern, and ending checks before they can reach ACE-Step；
-- Every stage must have an explicit status; dry-run can only generate plans and reports, never fake audio outputs；
-- The current syllable counter is a heuristic; a professional language syllable counter can be swapped in later；
-- Real execution depends on user-provided separation tools, ASR, ACE-Step 1.5, RVC, and Feibi model paths; the repository does not store model weights or user audio；
-- Harness Markdown files must be generated or converted from JSON through harness/harness_context.py instead of being edited directly；
+- pipeline.py 只负责阶段编排和报告，不直接实现外部模型推理；
+- 外部模型和命令必须通过 adapters.py 与 external.py 的协议边界接入；
+- 每个阶段必须声明明确输入、输出、必需字段和失败条件；
+- 用户歌词优先；只有没有用户歌词且启用回退时才运行 ASR；
+- wrapper 命令、backend 命令和 engine 命令必须分层配置，不能把真实引擎细节硬编码进业务流程；
+- 真实运行必须检查命令返回码和声明输出是否存在；dry-run 只能生成计划和报告，不得伪造真实音频产物；
+- 歌词改写结果必须保留输入行数，并通过音节数和菲比模式校验后才能进入 ACE-Step；
+- 当前音节统计是启发式实现，真实运行依赖用户提供 ASR、LLM、ACE-Step、RVC 和分离工具及其模型路径；
+- RVC 模型和索引统一使用配置路径，示例默认指向仓库 models/rvc/；
+- ARCHITECTURE.md、PROGRESS.md、FEATURES.md、DECISIONS.md 必须通过 harness/harness_context.py 从 JSON 生成；FEATURES.md 和 DECISIONS.md 的读取及索引使用脚本；

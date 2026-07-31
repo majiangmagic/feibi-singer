@@ -1,11 +1,15 @@
 {
-  "separation_command": "",
-  "asr_command": "",
-  "llm_command": "",
-  "ace_step_command": "",
-  "rvc_command": "",
-  "rvc_model": "C:/Users/Admin/Desktop/feibiv1.0.0_e200_s1600.pth",
-  "rvc_index": "C:/Users/Admin/Desktop/feibiv1.0.0_v2.index",
+  "separation_command": "python -m feibi_singer.external --stage separation --input \"{input_audio}\" --vocals \"{vocals}\" --instrumental \"{instrumental}\" --request-json \"{request_json}\" --stage-dir \"{stage_dir}\" --run-dir \"{run_dir}\"",
+  "asr_command": "python -m feibi_singer.external --stage asr --backend-command \"{asr_backend_command}\" --source-audio \"{source_audio}\" --transcript-json \"{transcript_json}\" --transcript-txt \"{transcript_txt}\" --language \"{language}\" --request-json \"{request_json}\" --stage-dir \"{stage_dir}\"",
+  "llm_command": "python -m feibi_singer.external --stage lyric_rewrite --backend-command \"{llm_backend_command}\" --rewritten-json \"{rewrite_json}\" --rewritten-lines \"{rewritten_lines}\" --request-json \"{request_json}\" --stage-dir \"{stage_dir}\"",
+  "ace_step_command": "python -m feibi_singer.external --stage ace_step_lyric_edit --backend-command \"{ace_step_backend_command}\" --source-audio \"{source_audio}\" --lyrics \"{rewritten_lyrics_path}\" --output \"{generated_song}\" --mode \"{mode}\" --validation \"{validation}\" --request-json \"{request_json}\" --stage-dir \"{stage_dir}\"",
+  "rvc_command": "python -m feibi_singer.external --stage rvc_voice_conversion --backend-command \"{rvc_backend_command}\" --source-song \"{source_song}\" --model \"{rvc_model}\" --index \"{rvc_index}\" --output \"{final_song}\" --request-json \"{request_json}\" --stage-dir \"{stage_dir}\"",
+  "rvc_model": "models/rvc/feibiv1.0.0_e200_s1600.pth",
+  "rvc_index": "models/rvc/feibiv1.0.0_v2.index",
   "device": "cuda",
-  "language": "auto"
+  "language": "auto",
+  "asr_backend_command": "python \"{repo_root}\\scripts\\feibi_asr_backend.py\"",
+  "llm_backend_command": "python \"{repo_root}\\scripts\\feibi_llm_cloudmist.py\"",
+  "ace_step_backend_command": "python \"{repo_root}\\scripts\\feibi_ace_step_backend.py\"",
+  "rvc_backend_command": "python \"{repo_root}\\scripts\\feibi_rvc_backend.py\""
 }
