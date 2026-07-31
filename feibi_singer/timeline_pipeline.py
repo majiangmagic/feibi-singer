@@ -9,6 +9,8 @@ from pathlib import Path
 
 from .feibi_rules import rewrite_lyrics
 
+VOCAL_MIX_GAIN_DB = 2.0
+
 
 def select_vocal_window(silencedetect_output: str, duration: float) -> tuple[float, float]:
     starts = [float(value) for value in re.findall(r"silence_start: ([0-9.]+)", silencedetect_output)]
@@ -138,10 +140,16 @@ def run_timeline_pipeline(
     delay_ms = round(vocal_start * 1000)
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(converted), "-filter_complex", f"[0:a]adelay={delay_ms}|{delay_ms},apad=whole_dur={duration},atrim=duration={duration}[out]", "-map", "[out]", "-c:a", "pcm_s24le", str(aligned)], check=True)
     final_song = output_dir / "final_feibi_song.wav"
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(instrumental), "-i", str(aligned), "-filter_complex", "[0:a]aresample=48000[inst];[1:a]pan=stereo|c0=c0|c1=c0[voc];[inst][voc]amix=inputs=2:duration=first:normalize=0,volume=0.85,alimiter=limit=0.8913:level=false[out]", "-map", "[out]", "-c:a", "pcm_s24le", str(final_song)], check=True)
+    mix_filter = (
+        "[0:a]aresample=48000[inst];"
+        f"[1:a]pan=stereo|c0=c0|c1=c0,volume={VOCAL_MIX_GAIN_DB}dB[voc];"
+        "[inst][voc]amix=inputs=2:duration=first:normalize=0,"
+        "volume=0.85,alimiter=limit=0.8913:level=false[out]"
+    )
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(instrumental), "-i", str(aligned), "-filter_complex", mix_filter, "-map", "[out]", "-c:a", "pcm_s24le", str(final_song)], check=True)
     final_mp3 = output_dir / "final_feibi_song.mp3"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(final_song), "-c:a", "libmp3lame", "-b:a", "320k", str(final_mp3)], check=True)
 
-    report = {"status": "completed", "strategy": "timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
+    report = {"status": "completed", "strategy": "timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "mix": {"vocal_gain_db": VOCAL_MIX_GAIN_DB}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
     (output_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

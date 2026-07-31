@@ -326,5 +326,5 @@
   2. 只将演唱窗口送入 ACE-Step。；
   3. 确认对齐人声从原唱起点开始。；
   4. 确认最终混音使用原始伴奏并保持原曲时长。。
-- 验证证据：统一 CLI 默认入口对真实 unhappy 音频自动检测到约 16.44-82.55 秒演唱窗口，report.json 返回 timeline_aligned_original_instrumental；aligned_vocals 前 16.44 秒静音并与原始伴奏混合；3 项窗口检测测试及全部 13 项测试通过。。
-- 备注：scripts/feibi_pipeline.py 非 dry-run 默认调用 timeline_pipeline；旧整曲 ACE/RVC 路径仅通过 --legacy-direct-pipeline 显式启用。。
+- 验证证据：统一 CLI 默认入口对真实 unhappy 音频自动检测到约 16.44-82.55 秒演唱窗口，report.json 返回 timeline_aligned_original_instrumental；aligned_vocals 前 16.44 秒静音并与原始伴奏混合；默认人声增益测试及全部 14 项测试通过。。
+- 备注：scripts/feibi_pipeline.py 非 dry-run 默认调用 timeline_pipeline；默认混音将 RVC 人声提高 2 dB；旧整曲 ACE/RVC 路径仅通过 --legacy-direct-pipeline 显式启用。。

@@ -4,8 +4,8 @@
       "hash": "3b65bec",
       "message": "跑通真实菲比演唱链路"
     },
-    "test_status": "项目独立 Python 3.11 venv 中 13 项 pytest 通过；真实 98.2 秒音频完成时间轴对齐、ACE-Step、RVC 和原始伴奏混音验证",
-    "lint": "默认真实入口已自动检测约 16.44-82.55 秒原唱窗口并延迟歌声；旧整曲直通方案改为显式 legacy 选项"
+    "test_status": "项目独立 Python 3.11 venv 中 14 项 pytest 通过；真实 98.2 秒音频完成时间轴对齐、ACE-Step、RVC 和提高 2 dB 人声后的原始伴奏混音验证",
+    "lint": "默认真实入口已自动检测原唱窗口并延迟歌声，RVC 人声混音默认增加 2 dB；旧整曲直通方案改为显式 legacy 选项"
   },
   "completed": [
     "已用 Demucs CUDA 对用户 MP3 和 ACE-Step 输出完成真实人声/伴奏分离",
