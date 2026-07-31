@@ -1,10 +1,10 @@
-# FEATURES.md
+﻿# FEATURES.md
 
 ## 功能清单规则
 
 - 每次只激活一个功能项；
-- 功能状态包括：`not_started`、`in_progress`、`blocked` 和 `passing`。同一时间只能有一个功能处于 `in_progress` 状态。功能只有在验证命令通过并留下证据后，才能标记为 `passing`。
-- 功能状态根据单元、集成和端到端验证结果更新，不能仅凭代码或文档已经写完就标记完成。
+- 功能状态通常包括：`not_started`、`in_progress`、`blocked` 和 `passing`。同一时间只能有一个功能处于 `in_progress` 状态。功能只有在验证命令通过并留下证据后，才能标记为 `passing`。
+- 功能状态应根据验证结果更新，不能仅凭主观判断标记完成。
 
 ## F01：菲比演唱 dry-run 流水线
 

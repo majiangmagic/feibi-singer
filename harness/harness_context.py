@@ -366,8 +366,33 @@ class FeaturesHandler(DocumentHandler):
         "notes": "\u5907\u6ce8",
     }
 
+    RULES = (
+        "\u6bcf\u6b21\u53ea\u6fc0\u6d3b\u4e00\u4e2a\u529f\u80fd\u9879\uff1b",
+        "\u529f\u80fd\u72b6\u6001\u901a\u5e38\u5305\u62ec\uff1a`not_started`\u3001`in_progress`\u3001`blocked` \u548c `passing`\u3002\u540c\u4e00\u65f6\u95f4\u53ea\u80fd\u6709\u4e00\u4e2a\u529f\u80fd\u5904\u4e8e `in_progress` \u72b6\u6001\u3002\u529f\u80fd\u53ea\u6709\u5728\u9a8c\u8bc1\u547d\u4ee4\u901a\u8fc7\u5e76\u7559\u4e0b\u8bc1\u636e\u540e\uff0c\u624d\u80fd\u6807\u8bb0\u4e3a `passing`\u3002",
+        "\u529f\u80fd\u72b6\u6001\u5e94\u6839\u636e\u9a8c\u8bc1\u7ed3\u679c\u66f4\u65b0\uff0c\u4e0d\u80fd\u4ec5\u51ed\u4e3b\u89c2\u5224\u65ad\u6807\u8bb0\u5b8c\u6210\u3002",
+    )
+    ALLOWED_STATUSES = frozenset({"not_started", "in_progress", "blocked", "passing"})
+    @classmethod
+    def _validate_features(cls, features: list[JsonObject]) -> None:
+        in_progress_count = 0
+        for item in features:
+            status = item["status"]
+            if not isinstance(status, str) or status not in cls.ALLOWED_STATUSES:
+                allowed = ", ".join(sorted(cls.ALLOWED_STATUSES))
+                raise ValueError(f"feature status must be one of: {allowed}")
+            if status == "in_progress":
+                in_progress_count += 1
+            if status == "passing":
+                evidence = item["verification_evidence"]
+                if not isinstance(evidence, str) or not evidence.strip():
+                    raise ValueError("passing feature must contain verification_evidence")
+        if in_progress_count > 1:
+            raise ValueError("only one feature may be in_progress")
+
     def format(self, data: JsonObject) -> str:
         rules = Text.require_string_list(data.get("rules"), "rules")
+        if rules != list(self.RULES):
+            raise ValueError("FEATURES.md rules are fixed and cannot be modified")
         features = data.get("features")
         if not isinstance(features, list):
             raise ValueError("features must be an array")
@@ -409,6 +434,7 @@ class FeaturesHandler(DocumentHandler):
                 f"- {self.labels['evidence']}{Text.COLON}{item['verification_evidence']}{Text.PERIOD}"
             )
             lines.append(f"- {self.labels['notes']}{Text.COLON}{item['notes']}{Text.PERIOD}")
+        self._validate_features(features)
         return "\n".join(lines) + "\n"
 
     def parse(self, markdown: str) -> JsonObject:
@@ -431,6 +457,8 @@ class FeaturesHandler(DocumentHandler):
         if any(not line.startswith("- ") for line in rule_lines):
             raise ValueError("invalid feature rule")
         rules = [line[2:] for line in rule_lines]
+        if rules != list(self.RULES):
+            raise ValueError("FEATURES.md rules are fixed and cannot be modified")
 
         features = []
         for position, start in enumerate(feature_indexes):
@@ -498,7 +526,8 @@ class FeaturesHandler(DocumentHandler):
             if cursor != len(block):
                 raise ValueError("unexpected content in feature block")
             features.append(item)
-        return {"rules": rules, "features": features}
+        self._validate_features(features)
+        return {"rules": list(self.RULES), "features": features}
 
 
 class DocumentRegistry:
