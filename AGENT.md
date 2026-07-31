@@ -41,5 +41,5 @@ python scripts\feibi_pipeline.py --input .\song.wav --lyrics .\lyrics.txt --outp
 3. 回到 `PROGRESS.md` 分析是否需要更新其内容后，从最新的“下一步”部分开始工作。
 
 ## 每次会话结束前
-1. 按需更新 `PROGRESS.md`、`FEATURES.md`、`DECISIONS.md`，以及本次修改涉及的 `ARCHITECTURE.md`；
+1. 按需更新 `PROGRESS.md`、`FEATURES.md`、`DECISIONS.md`，以及本次修改涉及的 `ARCHITECTURE.md`、 `PROGRESS.md`更新时已完成、进行中、已知问题、下一步的条目最多5条酌情删除；
 2. 提交所有已完成且通过验证的工作。
