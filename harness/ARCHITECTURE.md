@@ -1,0 +1,27 @@
+# ARCHITECTURE.md
+
+## 模块说明
+本目录用于管理 Harness 上下文文件。
+
+使用方法：
+AI 只生成 JSON；
+使用 python harness_context.py --type <类型> --direction json-to-md --input <输入 JSON> --output <输出 Markdown> 将 JSON 生成固定格式的 Markdown；
+使用 --direction md-to-json 将 Markdown 转回 JSON；
+使用 --direction search --keyword <索引关键词> 查询 DECISIONS.md 或 FEATURES.md；
+使用 --direction latest --limit 5 查询 DECISIONS.md 或 FEATURES.md 中按日期排序的最新记录。
+脚本采用面向对象结构，由 DocumentHandler 及各文档处理器负责固定格式转换，由 DocumentRegistry 统一管理文档类型，由 IndexService 提供索引查询和最新功能查询。
+
+## 目录结构
+- `harness_context.py`：面向对象工程化的通用 JSON 和 Markdown 双向转换脚本，包含 DocumentHandler、ArchitectureHandler、ProgressHandler、DecisionsHandler、FeaturesHandler、DocumentRegistry、IndexService、FileStore、ConversionService 和 CliApplication；
+- `architecture.example.json`：ARCHITECTURE.md 的 JSON 示例；
+- `ARCHITECTURE.md`：本目录结构和使用方法说明；
+- `progress.example.json`：PROGRESS.md 的 JSON 示例；
+- `decisions.example.json`：DECISIONS.md 的 JSON 示例；
+- `features.example.json`：FEATURES.md 的 JSON 示例；
+
+## 设计约束
+- AI 只生成 JSON，不直接生成固定格式的 Markdown；
+- Markdown 必须通过 harness_context.py 从 JSON 生成；
+- DECISIONS.md 和 FEATURES.md 的索引使用 JSON 中的 keywords 数组；
+- DECISIONS.md 和 FEATURES.md 的日期使用 YYYY-MM-DD 格式；
+- DocumentHandler 子类负责各类文档的固定格式处理，DocumentRegistry 统一注册和选择文档类型；
