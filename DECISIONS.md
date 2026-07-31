@@ -75,7 +75,17 @@
 - 索引：RVC, 歌声分离, 伴奏, Demucs, 混音
 - 日期：2026-08-01
 - 状态：adopted
-- 决策：ACE-Step 生成整首歌曲后再次做人声/伴奏分离，只把歌声轨送入 RVC，再与生成伴奏混合为最终立体声。
-- 原因：直接对整首混音执行 RVC 会把伴奏一并送入声纹模型，并且旧 wrapper 输出单声道，导致音质和声场受损。
-- 放弃方案：不直接把 ACE-Step 完整混音作为 RVC 输入并把其单声道结果当最终歌曲。
-- 影响：真实链路增加 generated_song_separation 和 final_mix 两个可观测步骤；最终输出保持 48 kHz 立体声并留出峰值余量。
+- 决策：ACE-Step 生成演唱窗口后再次做人声/伴奏分离，只把歌声轨送入 RVC，再按原唱起点补静音并与原始伴奏混合为最终立体声。
+- 原因：直接对整首混音执行 RVC 会把伴奏一并送入声纹模型；使用 ACE-Step 伴奏还会改变原曲编曲和前后时间轴。
+- 放弃方案：不直接把 ACE-Step 完整混音作为 RVC 输入，也不再默认使用 ACE-Step 重新生成的伴奏。
+- 影响：默认真实链路增加原唱窗口检测、generated_song_separation、vocal delay 和 final_mix；最终输出保留原始伴奏与原曲总时长。
+
+## 时间轴对齐和原始伴奏成为默认方案
+
+- 索引：默认方案, 时间轴, 原始伴奏, 前奏, 尾奏, legacy
+- 日期：2026-08-01
+- 状态：adopted
+- 决策：非 dry-run 默认从原分离人声检测长前奏与长尾奏静音，只截取演唱区间给 ACE-Step，RVC 后按原起点延迟并混回原始伴奏。
+- 原因：ACE-Step cover 不接收逐句时间戳，整曲生成会从开头自行安排人声，并改写原伴奏；演唱窗口加延迟可以稳定保持前奏、尾奏和整体结构。
+- 放弃方案：不再默认把完整原曲交给 ACE-Step 后直接使用其整曲输出；该旧方案仅保留为 --legacy-direct-pipeline 调试选项。
+- 影响：scripts/feibi_pipeline.py 默认调用 timeline_pipeline；最终报告记录 vocal window、delay、aligned vocals 和 original instrumental。

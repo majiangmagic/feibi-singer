@@ -15,3 +15,6 @@ models/rvc/hf/
 models/rvc/torch/
 models/rvc/runtime/
 models/rvc/upstream/
+models/rvc/assets/
+models/huggingface/
+models/modelscope/

@@ -22,12 +22,24 @@ def main() -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-asr-fallback", action="store_true", help="skip ASR fallback when lyrics are provided")
+    parser.add_argument("--legacy-direct-pipeline", action="store_true", help="use the old whole-song ACE/RVC path")
     args = parser.parse_args()
 
     cfg = PipelineConfig()
     if args.config:
         cfg = PipelineConfig(**json.loads(args.config.read_text(encoding="utf-8-sig")))
     lines = args.lyrics.read_text(encoding="utf-8-sig").splitlines() if args.lyrics else []
+    if not args.dry_run and not args.legacy_direct_pipeline:
+        from feibi_singer.timeline_pipeline import run_timeline_pipeline
+
+        report = run_timeline_pipeline(
+            args.input.resolve(),
+            args.output_dir.resolve(),
+            lines,
+            use_asr_fallback=not args.no_asr_fallback,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     report = FeibiPipeline(cfg, dry_run=args.dry_run).run(
         args.input,
         args.output_dir,

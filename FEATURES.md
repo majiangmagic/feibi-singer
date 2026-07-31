@@ -312,3 +312,19 @@
   4. 执行真实配置前置校验。。
 - 验证证据：当前示例包含五个 wrapper 和四个 backend，但缺少 separation_backend_command 以及 ASR、ACE-Step、RVC engine 命令，尚不可直接真实运行。。
 - 备注：LLM backend 直接调用 API，因此通过环境变量提供凭据而不是独立 engine 命令。。
+
+## F21：默认保留原伴奏并按原唱时间轴对齐
+
+- 索引：默认方案, 时间轴, 原始伴奏, vocal window, adelay, RVC
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`核心流程`
+- 用户可见行为：非 dry-run 默认检测原唱首尾活动区间，只生成该演唱窗口，RVC 后按原起点补静音，并与原始伴奏混音。。
+- 状态：`passing`
+- 验证步骤：
+  1. 检测原分离人声的长前奏和长尾奏静音。；
+  2. 只将演唱窗口送入 ACE-Step。；
+  3. 确认对齐人声从原唱起点开始。；
+  4. 确认最终混音使用原始伴奏并保持原曲时长。。
+- 验证证据：统一 CLI 默认入口对真实 unhappy 音频自动检测到约 16.44-82.55 秒演唱窗口，report.json 返回 timeline_aligned_original_instrumental；aligned_vocals 前 16.44 秒静音并与原始伴奏混合；3 项窗口检测测试及全部 13 项测试通过。。
+- 备注：scripts/feibi_pipeline.py 非 dry-run 默认调用 timeline_pipeline；旧整曲 ACE/RVC 路径仅通过 --legacy-direct-pipeline 显式启用。。
