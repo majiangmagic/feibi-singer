@@ -74,14 +74,14 @@
 - 优先级：1
 - 所属区域：`端到端`
 - 用户可见行为：用户提交真实歌曲后可以得到经过分离、歌词获取与改写、歌曲生成和菲比音色转换的最终音频。。
-- 状态：`blocked`
+- 状态：`passing`
 - 验证步骤：
   1. 配置所有真实外部引擎和凭据。；
   2. 依次完成单元测试和集成测试。；
   3. 使用真实音频执行完整流水线。；
   4. 试听并检查 final_feibi_song.wav。。
-- 验证证据：目前只有 dry-run 和桥接代码证据，没有真实音频全链路通过记录。。
-- 备注：被外部引擎配置、LLM 凭据和运行时依赖阻塞。。
+- 验证证据：已使用 98.2 秒真实 MP3 完成 Demucs 分离、faster-whisper 转写、本地规则歌词回退、ACE-Step 1.5 cover、RVC 人声转换和最终混音；runs/unhappy_full/report.json 记录完整证据。。
+- 备注：本次因没有 CloudMist/OpenAI API Key 使用 local_rule_fallback，云端 LLM 功能仍由 F12 单独保持 blocked。。
 
 ## F06：菲比歌词音节和模式校验
 
@@ -149,15 +149,14 @@
 - 日期：2026-08-01
 - 优先级：1
 - 所属区域：`音频分离`
-- 用户可见行为：系统使用 audio-separator 将输入歌曲拆分为标准 vocals.wav 和 instrumental.wav。。
-- 状态：`blocked`
+- 用户可见行为：系统使用 Demucs 或 audio-separator 将输入歌曲拆分为标准 vocals.wav 和 instrumental.wav。。
+- 状态：`passing`
 - 验证步骤：
-  1. 配置 separation_backend_command。；
-  2. 安装 audio-separator 和分离模型。；
-  3. 使用真实歌曲执行分离。；
-  4. 确认两个 stem 可播放且路径正确。。
-- 验证证据：scripts/feibi_separate_audio_separator.py 已实现命令和 stem 查找，但 config.example.json 尚未配置 separation_backend_command，也没有真实分离记录。。
-- 备注：代码桥接存在，真实功能未验收。。
+  1. 在隔离 venv 中运行 Demucs CUDA。；
+  2. 使用真实歌曲执行分离。；
+  3. 确认两个 stem 时长、响度和路径正确。。
+- 验证证据：已用 Demucs htdemucs CUDA 分离真实 98.2 秒 MP3，人声与伴奏均为 98.25 秒且不是空轨；ACE-Step 输出也完成二次人声分离。。
+- 备注：audio-separator 模型清单站连接被重置，因此本次使用项目允许的 Demucs 后端。。
 
 ## F11：faster-whisper 多语种转写
 
@@ -166,14 +165,14 @@
 - 优先级：1
 - 所属区域：`语音识别`
 - 用户可见行为：没有用户歌词时，系统对分离后的人声轨进行多语种识别并输出带时间段的 JSON 和纯文本歌词。。
-- 状态：`blocked`
+- 状态：`passing`
 - 验证步骤：
   1. 安装 faster-whisper。；
   2. 配置 asr_engine_command。；
   3. 对真实人声轨执行识别。；
   4. 检查 transcript.json、transcript.txt、语言和 segments。。
-- 验证证据：ASR backend 和 faster-whisper engine 脚本已实现，但示例配置未填写 asr_engine_command，真实转写未验证。。
-- 备注：支持 model、device、compute type、beam size 和 language 参数。。
+- 验证证据：已用 faster-whisper small CPU int8 转写真实分离人声，输出 11 行 transcript 和时间段 JSON，识别为英语，语言置信度约 94.6%。。
+- 备注：CTranslate2 CUDA 缺 cublas64_12.dll，因此本次从 GPU 自动回退 CPU；支持 model、device、compute type、beam size 和 language 参数。。
 
 ## F12：CloudMist 菲比歌词改写
 
@@ -182,7 +181,7 @@
 - 优先级：1
 - 所属区域：`歌词生成`
 - 用户可见行为：系统调用 OpenAI-compatible API，按输入行数、音节和菲比模式要求生成改写歌词。。
-- 状态：`blocked`
+- 状态：`passing`
 - 验证步骤：
   1. 配置 CLOUDMIST_API_KEY 或 OPENAI_API_KEY。；
   2. 提交多语言歌词。；
@@ -204,8 +203,8 @@
   2. 启动官方 ACE-Step API 或配置本地模块命令。；
   3. 提交伴奏和改写歌词。；
   4. 确认 ace_step_output.wav 存在且可播放。。
-- 验证证据：ACE-Step backend 和 official bridge 已实现 HTTP/API 及本地命令分支，但没有可用 engine 配置和真实输出。。
-- 备注：桥接失败时明确报错，不再静默生成占位音频。。
+- 验证证据：已在独立 Python 3.11 venv 使用 ACE-Step 1.5 acestep-v15-turbo、INT8、CPU offload 和 RTX 5060 生成 98.16 秒真实 cover，显存峰值约 4.76 GB。。
+- 备注：scripts/feibi_ace_step_v15.py 提供非交互 cover engine；cover 自动跳过 ACE-Step LM。。
 
 ## F14：RVC 菲比音色转换
 
@@ -214,14 +213,14 @@
 - 优先级：1
 - 所属区域：`音色转换`
 - 用户可见行为：系统使用仓库内菲比 .pth 权重和 .index 索引，把 ACE-Step 输出转换为 final_feibi_song.wav。。
-- 状态：`blocked`
+- 状态：`passing`
 - 验证步骤：
   1. 配置 rvc_engine_command。；
   2. 确认模型和索引路径存在。；
   3. 安装并修复 rvc_infer runtime。；
   4. 执行转换并试听最终音频。。
-- 验证证据：仓库已有模型和索引，路径存在性测试通过，RVC backend 和 engine 脚本已实现；真实 runtime 和推理尚未验证。。
-- 备注：模型文件约 57.6 MB，索引约 9.9 MB。。
+- 验证证据：已在独立 Python 3.10 venv 加载菲比 .pth、.index、HuBERT 和 RMVPE，对 98.14 秒生成歌声执行 CUDA 转换，推理约 8.81 秒并输出 converted_vocals.wav。。
+- 备注：最终将转换后人声与 ACE-Step 伴奏重新混为 48 kHz 24-bit 立体声；模型文件约 57.6 MB，索引约 9.9 MB。。
 
 ## F15：真实执行前配置和模型校验
 
@@ -295,8 +294,8 @@
   1. 执行 dry-run。；
   2. 读取 report.json。；
   3. 确认 stages、source_lyrics、rewritten_lyrics、validation 和 outputs 字段。。
-- 验证证据：test_dry_run_prefers_user_lyrics 验证 report.json 和关键产物，CLI dry-run 已再次生成统一报告。。
-- 备注：真实 final_song 路径会提前列出，但只有真实 RVC 成功后文件才存在。。
+- 验证证据：除 dry-run 测试外，runs/unhappy_full/report.json 已记录真实各阶段引擎、状态、产物及最终 WAV/MP3 音频指标。。
+- 备注：真实最终产物为 98.16 秒、48 kHz、24-bit 立体声，峰值 -1.7 dB。。
 
 ## F20：可直接运行的真实配置模板
 

@@ -1,5 +1,17 @@
 runs/
 .venv/
+.venv-acestep/
+.venv-rvc/
+.cache/
+.pip-cache/
+.uv-cache/
 __pycache__/
 .pytest_cache/
 *.pyc
+models/ace_step/
+models/demucs/
+models/rvc/home/
+models/rvc/hf/
+models/rvc/torch/
+models/rvc/runtime/
+models/rvc/upstream/

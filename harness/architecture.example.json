@@ -1,5 +1,5 @@
 {
-  "module_description": "菲比演唱器是一个可插拔的本地音频流水线。输入歌曲和可选歌词后，流水线先做人声与伴奏分离；用户提供歌词时优先使用用户歌词，否则按配置回退到 ASR；随后通过外部 LLM 改写为菲比风格歌词，校验每行音节数和模式，再调用 ACE-Step 1.5 仅改词模式生成歌曲，最后通过 RVC 转换为菲比音色。当前代码已经完成 dry-run、阶段协议、wrapper/backend/engine 命令分层和真实桥接脚本；真实端到端运行仍依赖外部工具、模型、凭据和有效配置。",
+  "module_description": "菲比演唱器是一个可插拔的本地音频流水线。输入歌曲和可选歌词后，流水线先做人声与伴奏分离；用户提供歌词时优先使用用户歌词，否则回退到 ASR；随后通过外部 LLM 或明确标记的本地规则回退改写菲比歌词，校验音节数和模式，再调用 ACE-Step 1.5 cover 生成新歌。为避免 RVC 改变伴奏，真实链路会再次分离 ACE-Step 输出，只转换歌声并混回伴奏。Demucs、ACE-Step、RVC 使用互相隔离的 D 盘 venv；真实 98.2 秒音频端到端已验证，CloudMist 分支仍需 API Key。",
   "directory_structure": [
     {"path": "feibi_singer/models.py", "description": "定义 PipelineConfig、PipelineProtocol、StageContract、StageResult 和 PipelineReport，并声明五个阶段的输入输出、占位符和环境变量协议"},
     {"path": "feibi_singer/pipeline.py", "description": "编排分离、歌词选择、ASR、歌词改写、ACE-Step、RVC 和报告汇总，负责写入 manifest、协议、校验和阶段产物"},
@@ -13,6 +13,7 @@
     {"path": "scripts/feibi_llm_cloudmist.py", "description": "调用 CloudMist OpenAI-compatible API，根据菲比规则生成与输入行数对应的改写歌词"},
     {"path": "scripts/feibi_ace_step_backend.py", "description": "ACE-Step backend wrapper，转调真实 engine 并检查生成音频"},
     {"path": "scripts/feibi_ace_step_official.py", "description": "ACE-Step engine bridge，支持配置官方本地命令或 HTTP API，不再静默伪造音频"},
+    {"path": "scripts/feibi_ace_step_v15.py", "description": "ACE-Step 1.5 非交互 cover engine，支持 INT8、CPU offload、源音频、新歌词和确定性 seed"},
     {"path": "scripts/feibi_rvc_backend.py", "description": "RVC backend wrapper，转调真实 engine 并检查最终音频"},
     {"path": "scripts/feibi_rvc_infer.py", "description": "使用 rvc_infer 加载仓库内模型和索引并执行真实音色转换"},
     {"path": "config.example.json", "description": "提供 wrapper 命令、现有 backend 命令、RVC 模型索引路径、设备和语言模板；真实分离 backend 及 ASR、ACE-Step、RVC engine 命令仍需补齐"},
@@ -29,7 +30,9 @@
     "wrapper 命令、backend 命令和 engine 命令必须分层配置，不能把真实引擎细节硬编码进业务流程",
     "真实运行必须检查命令返回码和声明输出是否存在；dry-run 只能生成计划和报告，不得伪造真实音频产物",
     "歌词改写结果必须保留输入行数，并通过音节数和菲比模式校验后才能进入 ACE-Step",
-    "当前音节统计是启发式实现，真实运行依赖用户提供 ASR、LLM、ACE-Step、RVC 和分离工具及其模型路径",
+    "当前音节统计是启发式实现；没有 LLM Key 时只能使用明确标记的 local_rule_fallback，不能声称云端 LLM 已执行",
+    "ACE-Step 和 RVC 必须使用各自兼容的隔离 venv，模型和缓存统一放在 D 盘并由 .gitignore 排除",
+    "RVC 只转换生成歌声轨，转换后再与生成伴奏混合，避免对整首伴奏做音色转换",
     "RVC 模型和索引统一使用配置路径，示例默认指向仓库 models/rvc/",
     "ARCHITECTURE.md、PROGRESS.md、FEATURES.md、DECISIONS.md 必须通过 harness/harness_context.py 从 JSON 生成；FEATURES.md 和 DECISIONS.md 的读取及索引使用脚本"
   ]

@@ -58,4 +58,24 @@
 - 决策：当前阶段先完成真实外部命令和配置接线；不主动增加无关测试，但必须运行现有单元、集成和 dry-run 验证。
 - 原因：核心风险在外部工具和配置能否真正协作，先接实链路比扩大测试数量更重要。
 - 放弃方案：不在真实命令未配置前把主要工作转为新增测试覆盖率。
-- 影响：功能状态只能依据现有验证证据标记；真实端到端仍保持 in_progress，不能写成 passing。
+- 影响：功能状态只能依据现有验证证据标记；真实端到端没有实际音频证据前不能写成 passing。
+
+## ACE-Step 与 RVC 使用独立兼容虚拟环境
+
+- 索引：venv, Python 3.11, Python 3.10, ACE-Step, RVC, D盘
+- 日期：2026-08-01
+- 状态：adopted
+- 决策：项目测试使用独立 Python 3.11 .venv；ACE-Step 使用 Python 3.11 .venv-acestep；旧 RVC/fairseq 使用 Python 3.10 .venv-rvc，所有环境、模型和缓存都放在 D 盘项目目录。
+- 原因：ACE-Step 要求 Python 小于 3.13，而 RVC 的 fairseq 0.12.2 不能在 Python 3.11+ 正常导入；合并环境会造成 PyTorch、NumPy 和 fairseq 冲突。
+- 放弃方案：不再用系统 Python 直接运行真实引擎，也不把 ACE-Step 与 RVC 强塞进同一个 venv。
+- 影响：配置和部署必须显式调用对应 venv 解释器；模型 runtime、下载缓存和 venv 目录由 .gitignore 排除。
+
+## RVC 只转换生成歌声并重新混音
+
+- 索引：RVC, 歌声分离, 伴奏, Demucs, 混音
+- 日期：2026-08-01
+- 状态：adopted
+- 决策：ACE-Step 生成整首歌曲后再次做人声/伴奏分离，只把歌声轨送入 RVC，再与生成伴奏混合为最终立体声。
+- 原因：直接对整首混音执行 RVC 会把伴奏一并送入声纹模型，并且旧 wrapper 输出单声道，导致音质和声场受损。
+- 放弃方案：不直接把 ACE-Step 完整混音作为 RVC 输入并把其单声道结果当最终歌曲。
+- 影响：真实链路增加 generated_song_separation 和 final_mix 两个可观测步骤；最终输出保持 48 kHz 立体声并留出峰值余量。
