@@ -42,5 +42,5 @@ python scripts\feibi_pipeline.py --input .\song.wav --lyrics .\lyrics.txt --outp
 
 ## 每次会话结束前
 1. 按需更新 `PROGRESS.md`、`FEATURES.md`、`DECISIONS.md`，以及本次修改涉及的 `ARCHITECTURE.md`、 `PROGRESS.md`更新时已完成、进行中、已知问题、下一步的条目最多5条酌情删除；
-2. 运行`\harness\check.py`脚本，并根据check脚本的指示解决问题。
+2. 运行`\harness\check.py`脚本，并根据check脚本的指示解决问题，然后再次运行`\harness\check.py`脚本，直到通过。
 3. 提交所有已完成且通过验证的工作。
