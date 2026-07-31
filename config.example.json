@@ -1,0 +1,10 @@
+{
+  "separation_command": "",
+  "asr_command": "",
+  "llm_command": "",
+  "ace_step_command": "",
+  "rvc_command": "",
+  "rvc_model": "",
+  "device": "cuda",
+  "language": "auto"
+}
