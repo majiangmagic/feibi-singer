@@ -1,36 +1,74 @@
 {
-  "module_description": "本目录用于管理 Harness 上下文文件。\n\n使用方法：\nAI 只生成 JSON；\n使用 python harness_context.py --type <类型> --direction json-to-md --input <输入 JSON> --output <输出 Markdown> 将 JSON 生成固定格式的 Markdown；\n使用 --direction md-to-json 将 Markdown 转回 JSON；\n使用 --direction search --keyword <索引关键词> 查询 DECISIONS.md 或 FEATURES.md；\n使用 --direction latest --limit 5 查询 DECISIONS.md 或 FEATURES.md 中按日期排序的最新记录。\n脚本采用面向对象结构，由 DocumentHandler 及各文档处理器负责固定格式转换，由 DocumentRegistry 统一管理文档类型，由 IndexService 提供索引查询和最新功能查询。",
+  "module_description": "菲比演唱器是一个面向本地音频处理的可插拔流水线。系统接收歌曲文件和可选歌词，依次完成音频素材准备、歌词识别或读取、歌词改写、ACE-Step 1.5 歌曲生成以及 RVC 菲比音色转换。当前实现优先保证流程边界、规则校验和 dry-run 可验证性；真实模型由外部适配器和用户配置接入。",
   "directory_structure": [
     {
-      "path": "harness_context.py",
-      "description": "面向对象工程化的通用 JSON 和 Markdown 双向转换脚本，包含 DocumentHandler、ArchitectureHandler、ProgressHandler、DecisionsHandler、FeaturesHandler、DocumentRegistry、IndexService、FileStore、ConversionService 和 CliApplication"
+      "path": "feibi_singer/models.py",
+      "description": "定义 PipelineConfig、StageResult 和 PipelineReport 等领域数据结构"
     },
     {
-      "path": "architecture.example.json",
-      "description": "ARCHITECTURE.md 的 JSON 示例"
+      "path": "feibi_singer/feibi_rules.py",
+      "description": "执行多语言启发式音节计数、菲比模式生成和歌词硬规则校验"
+    },
+    {
+      "path": "feibi_singer/adapters.py",
+      "description": "封装分离、ASR、ACE-Step 和 RVC 的外部命令边界；dry-run 时只生成阶段计划"
+    },
+    {
+      "path": "feibi_singer/pipeline.py",
+      "description": "唯一的业务流程编排入口，负责阶段顺序、工件保存和最终报告"
+    },
+    {
+      "path": "scripts/feibi_pipeline.py",
+      "description": "命令行入口，读取输入音频、歌词和 JSON 配置并启动流水线"
+    },
+    {
+      "path": "tests/test_rules.py",
+      "description": "菲比规则和多语言音节计数的单元测试"
+    },
+    {
+      "path": "tests/test_pipeline.py",
+      "description": "dry-run 流水线集成测试"
+    },
+    {
+      "path": "config.example.json",
+      "description": "外部工具命令、设备、语言和 RVC 模型路径的配置模板"
+    },
+    {
+      "path": "AGENT.md",
+      "description": "项目级开发约束、Harness 工作流程和验证要求"
     },
     {
       "path": "ARCHITECTURE.md",
-      "description": "本目录结构和使用方法说明"
+      "description": "项目整体架构、目录职责和设计约束"
     },
     {
-      "path": "progress.example.json",
-      "description": "PROGRESS.md 的 JSON 示例"
+      "path": "PROGRESS.md",
+      "description": "当前验证状态、已完成工作、进行中事项和下一步"
     },
     {
-      "path": "decisions.example.json",
-      "description": "DECISIONS.md 的 JSON 示例"
+      "path": "FEATURES.md",
+      "description": "按优先级维护的单功能项清单及验证证据"
     },
     {
-      "path": "features.example.json",
-      "description": "FEATURES.md 的 JSON 示例"
+      "path": "DECISIONS.md",
+      "description": "重要技术决策、原因、替代方案和影响"
+    },
+    {
+      "path": "harness/harness_context.py",
+      "description": "Harness JSON 与 Markdown 双向转换及索引查询工具"
+    },
+    {
+      "path": "harness/ARCHITECTURE.md",
+      "description": "Harness 子模块的结构、用法和约束"
     }
   ],
   "design_constraints": [
-    "AI 只生成 JSON，不直接生成固定格式的 Markdown",
-    "Markdown 必须通过 harness_context.py 从 JSON 生成",
-    "DECISIONS.md 和 FEATURES.md 的索引使用 JSON 中的 keywords 数组",
-    "DECISIONS.md 和 FEATURES.md 的日期使用 YYYY-MM-DD 格式",
-    "DocumentHandler 子类负责各类文档的固定格式处理，DocumentRegistry 统一注册和选择文档类型"
+    "pipeline.py 只负责流程编排，不直接实现外部模型推理",
+    "所有外部模型和命令必须通过 adapters.py 接入，禁止在业务代码中拼接 shell 命令",
+    "LLM 生成的候选歌词必须先通过 feibi_rules.py 的音节数、模式和结尾规则校验，校验失败时不得进入 ACE-Step 阶段",
+    "每个阶段必须产生明确状态；dry-run 只能生成计划文件和报告，不得伪装成已生成音频",
+    "音节计数当前采用可解释的启发式实现；专业语言音节计数器可作为后续替换适配器接入",
+    "真实运行依赖用户提供分离工具、ASR、ACE-Step 1.5、RVC 及菲比模型路径，仓库不提交模型权重和用户音频",
+    "Markdown 上下文文件必须通过 harness/harness_context.py 从 JSON 生成或转换，不能直接编辑固定格式 Markdown"
   ]
 }

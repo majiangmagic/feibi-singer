@@ -1,14 +1,35 @@
-﻿{
+{
   "decisions": [
     {
-      "title": "使用 PostgreSQL 保存用户数据",
-      "keywords": ["PostgreSQL"],
-      "date": "2026-04-29",
+      "title": "通过外部适配器接入音频模型和命令",
+      "keywords": [
+        "外部适配器",
+        "Demucs",
+        "Whisper",
+        "ACE-Step",
+        "RVC"
+      ],
+      "date": "2026-07-31",
       "status": "已采用",
-      "decision": "用户数据统一存储在 PostgreSQL 中。",
-      "reason": "项目需要支持事务、数据约束和可靠的关系查询，PostgreSQL 能够满足当前业务需求。",
-      "rejected_alternative": "不使用 SQLite 作为生产数据库，因为它不适合当前的并发访问和生产部署场景。",
-      "impact": "用户管理模块的 Repository 层必须通过 PostgreSQL 访问数据，测试环境需要提供对应的数据库实例。"
+      "decision": "分离、ASR、ACE-Step 和 RVC 均通过 feibi_singer/adapters.py 的统一边界接入，pipeline.py 只负责编排。",
+      "reason": "外部工具的安装方式、命令参数和运行环境差异较大，隔离适配器可以保持业务流程可测试，并允许 dry-run 在没有模型时生成可靠计划。",
+      "rejected_alternative": "不在 pipeline.py 或命令行入口中直接拼接并执行各模型命令，因为这会把外部环境细节耦合进业务流程。",
+      "impact": "新增或替换模型时必须扩展适配器和配置；业务代码只消费统一的阶段结果，测试可使用 dry-run 验证阶段顺序和工件。"
+    },
+    {
+      "title": "Harness Markdown 统一由 JSON 生成",
+      "keywords": [
+        "Harness",
+        "Markdown",
+        "JSON",
+        "harness_context.py"
+      ],
+      "date": "2026-07-31",
+      "status": "已采用",
+      "decision": "ARCHITECTURE.md、PROGRESS.md、FEATURES.md 和 DECISIONS.md 必须先构造 JSON，再通过 harness/harness_context.py 生成；读取和索引也通过该脚本完成。",
+      "reason": "固定格式文档需要稳定章节、字段和标点，结构化 JSON 加统一处理器可以避免手工编辑造成格式漂移，并支持机器校验。",
+      "rejected_alternative": "不继续直接手工维护固定格式 Markdown，因为现有文档已经与新处理器格式不兼容，无法可靠解析。",
+      "impact": "每次文档变更都要执行 JSON 到 Markdown 生成、Markdown 到 JSON 回读和结构化比较；FEATURES.md 与 DECISIONS.md 通过 keywords、search 和 latest 查询。"
     }
   ]
 }
