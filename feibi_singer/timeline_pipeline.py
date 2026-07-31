@@ -9,7 +9,20 @@ from pathlib import Path
 
 from .feibi_rules import rewrite_lyrics
 
-VOCAL_MIX_GAIN_DB = 2.0
+def measure_integrated_lufs(audio: Path, start: float = 0.0, duration: float | None = None) -> float:
+    command = ["ffmpeg", "-hide_banner", "-ss", str(start)]
+    if duration is not None:
+        command.extend(["-t", str(duration)])
+    command.extend(["-i", str(audio), "-af", "ebur128=framelog=verbose", "-f", "null", "NUL"])
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    values = re.findall(r"\bI:\s+(-?\d+(?:\.\d+)?)\s+LUFS", result.stderr)
+    if not values:
+        raise RuntimeError(f"unable to measure integrated loudness: {audio}")
+    return float(values[-1])
+
+
+def calculate_vocal_gain_db(original_lufs: float, converted_lufs: float) -> float:
+    return round(original_lufs - converted_lufs, 2)
 
 
 def select_vocal_window(silencedetect_output: str, duration: float) -> tuple[float, float]:
@@ -139,10 +152,13 @@ def run_timeline_pipeline(
     aligned = rvc_dir / "aligned_vocals.wav"
     delay_ms = round(vocal_start * 1000)
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(converted), "-filter_complex", f"[0:a]adelay={delay_ms}|{delay_ms},apad=whole_dur={duration},atrim=duration={duration}[out]", "-map", "[out]", "-c:a", "pcm_s24le", str(aligned)], check=True)
+    original_lufs = measure_integrated_lufs(vocals, vocal_start, vocal_duration)
+    converted_lufs = measure_integrated_lufs(aligned, vocal_start, vocal_duration)
+    vocal_gain_db = calculate_vocal_gain_db(original_lufs, converted_lufs)
     final_song = output_dir / "final_feibi_song.wav"
     mix_filter = (
         "[0:a]aresample=48000[inst];"
-        f"[1:a]pan=stereo|c0=c0|c1=c0,volume={VOCAL_MIX_GAIN_DB}dB[voc];"
+        f"[1:a]pan=stereo|c0=c0|c1=c0,volume={vocal_gain_db}dB[voc];"
         "[inst][voc]amix=inputs=2:duration=first:normalize=0,"
         "volume=0.85,alimiter=limit=0.8913:level=false[out]"
     )
@@ -150,6 +166,6 @@ def run_timeline_pipeline(
     final_mp3 = output_dir / "final_feibi_song.mp3"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(final_song), "-c:a", "libmp3lame", "-b:a", "320k", str(final_mp3)], check=True)
 
-    report = {"status": "completed", "strategy": "timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "mix": {"vocal_gain_db": VOCAL_MIX_GAIN_DB}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
+    report = {"status": "completed", "strategy": "timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "mix": {"vocal_gain_db": vocal_gain_db, "gain_mode": "match_original_vocal_integrated_lufs", "original_vocal_lufs": original_lufs, "converted_vocal_lufs": converted_lufs}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
     (output_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

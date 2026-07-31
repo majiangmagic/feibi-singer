@@ -1,10 +1,10 @@
 import pytest
 
-from feibi_singer.timeline_pipeline import VOCAL_MIX_GAIN_DB, select_vocal_window
+from feibi_singer.timeline_pipeline import calculate_vocal_gain_db, select_vocal_window
 
 
-def test_default_vocal_mix_gain_is_two_db():
-    assert VOCAL_MIX_GAIN_DB == 2.0
+def test_vocal_gain_matches_original_loudness():
+    assert calculate_vocal_gain_db(-12.5, -20.7) == 8.2
 
 
 def test_select_vocal_window_uses_long_intro_and_outro_silence():
