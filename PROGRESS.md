@@ -3,25 +3,25 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `a1fc666`（docs: add harness check guidance）
-- 测试状态：???? 4/4 ???Python compileall ??????????????
-- Lint：Python compileall ??
+- 最新 commit: `728cff2`（feat: flesh out feibi pipeline skeleton）
+- 测试状态：Passed: python -m compileall feibi_singer scripts tests; pytest -q 6 passed; CLI dry-run wrote stage artifacts successfully
+- Lint：Python compileall passed
 
 ### 已完成
-- [x] 菲比歌词规则层、外部阶段适配器和 dry-run 流水线已实现
-- [x] harness_context.py 已支持四类文档的 JSON/Markdown 双向转换及索引查询
-- [x] ARCHITECTURE.md、PROGRESS.md、FEATURES.md 和 DECISIONS.md 已从 UTF-8 JSON 重新生成
-- [x] 目标 Markdown 的 md-to-json 回读结果已与源 JSON 一致
-- [x] 单元测试、集成测试、Python 编译检查和 CLI dry-run 端到端验证均已通过
+- [x] The Feibi lyric rule layer, external stage adapters, and dry-run pipeline are implemented
+- [x] harness_context.py now supports JSON/Markdown round-trip conversion and index queries for the four document types
+- [x] ARCHITECTURE.md, PROGRESS.md, FEATURES.md, and DECISIONS.md have been regenerated from UTF-8 JSON
+- [x] Markdown md-to-json round-trip results match the source JSON
+- [x] Unit tests, integration tests, and Python compile checks all passed
 
 ### 进行中
-- [ ] 整理端到端菲比演唱器管线骨架，补齐阶段工件输出
+- [ ] Connecting the real ASR, LLM, ACE-Step 1.5, and RVC execution chain
 
 ### 已知问题
-- 真实音频链路尚未接入，目前只验证了 dry-run；
-- RVC 还需要接入用户提供的菲比模型文件。
+- The real audio chain is not connected yet; only dry-run has been validated；
+- RVC still needs the user-provided Feibi model files and index file。
 
 ### 下一步
-1. ????? ASR ???????；
-2. ?? LLM ????? ACE-Step 1.5 ??????；
-3. ?? RVC ??????。
+1. Add ASR as the fallback lyric source；
+2. Connect lyric rewriting with the LLM and song generation with ACE-Step 1.5；
+3. Connect the RVC voice conversion execution path and model validation。

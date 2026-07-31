@@ -4,7 +4,8 @@
   "llm_command": "",
   "ace_step_command": "",
   "rvc_command": "",
-  "rvc_model": "",
+  "rvc_model": "C:/Users/Admin/Desktop/feibiv1.0.0_e200_s1600.pth",
+  "rvc_index": "C:/Users/Admin/Desktop/feibiv1.0.0_v2.index",
   "device": "cuda",
   "language": "auto"
 }

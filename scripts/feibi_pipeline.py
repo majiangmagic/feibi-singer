@@ -13,19 +13,27 @@ from feibi_singer.pipeline import FeibiPipeline
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Feibi singer pipeline skeleton")
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--lyrics", type=Path)
     parser.add_argument("--config", type=Path)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-asr-fallback", action="store_true", help="skip ASR fallback when lyrics are provided")
     args = parser.parse_args()
 
     cfg = PipelineConfig()
     if args.config:
         cfg = PipelineConfig(**json.loads(args.config.read_text(encoding="utf-8-sig")))
-    lines = args.lyrics.read_text(encoding="utf-8").splitlines() if args.lyrics else []
-    report = FeibiPipeline(cfg, dry_run=args.dry_run).run(args.input, args.output_dir, lines)
+    lines = args.lyrics.read_text(encoding="utf-8-sig").splitlines() if args.lyrics else []
+    report = FeibiPipeline(cfg, dry_run=args.dry_run).run(
+        args.input,
+        args.output_dir,
+        lines,
+        use_asr_fallback=not args.no_asr_fallback,
+    )
     print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
     return 0
 

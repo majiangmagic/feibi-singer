@@ -13,6 +13,7 @@ class PipelineConfig:
     ace_step_command: str = ""
     rvc_command: str = ""
     rvc_model: str = ""
+    rvc_index: str = ""
     device: str = "cuda"
     language: str = "auto"
 
@@ -24,6 +25,7 @@ class PipelineConfig:
             "ace_step_command": self.ace_step_command,
             "rvc_command": self.rvc_command,
             "rvc_model": self.rvc_model,
+            "rvc_index": self.rvc_index,
             "device": self.device,
             "language": self.language,
         }
