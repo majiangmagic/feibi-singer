@@ -15,7 +15,7 @@ python scripts\feibi_pipeline.py --input .\song.wav --lyrics .\lyrics.txt --outp
 ```
 
 ## 开发约束
-- 所有编辑md文件的方式都是通过`\harness\harness_context.py`脚本去编辑json转换成md文件或者反过来使用脚本把md转换成json格式读取内容、且对于`FEATURES.md`、`DECISIONS.md`请使用索引搜索或者最新5条、禁止直接读取md文件只允许脚本读取和生成到指定位置。
+- 所有编辑md文件的方式都是通过`\harness\harness_context.py`脚本去编辑json转换成md文件或者反过来使用脚本把md转换成json格式读取内容、且对于`FEATURES.md`、`DECISIONS.md`请使用索引搜索或者最新5条、绝对禁止直接读取md文件只允许脚本读取和生成到指定位置。
 - 本项目架构说明见项目根目录下 `ARCHITECTURE.md`，子模块的架构设计说明见相关子模块目录的`ARCHITECTURE.md`
 - 判断需要时可以读 `DECISIONS.md` 了解历史做过的重要决策和决策的原因，但不要每次都读取；
 - 每次只做一个功能点，如果一次会话涉及多个功能点，无法一次会话完成，则应先将它们记录到 `FEATURES.md`，再按照优先级选取第一个功能点完成；尤其禁止在实现功能 A 时顺便重构功能 B。
@@ -42,4 +42,5 @@ python scripts\feibi_pipeline.py --input .\song.wav --lyrics .\lyrics.txt --outp
 
 ## 每次会话结束前
 1. 按需更新 `PROGRESS.md`、`FEATURES.md`、`DECISIONS.md`，以及本次修改涉及的 `ARCHITECTURE.md`、 `PROGRESS.md`更新时已完成、进行中、已知问题、下一步的条目最多5条酌情删除；
-2. 提交所有已完成且通过验证的工作。
+2. 运行`\harness\check.py`脚本，并根据check脚本的指示解决问题。
+3. 提交所有已完成且通过验证的工作。

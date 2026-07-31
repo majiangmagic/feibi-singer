@@ -9,6 +9,7 @@ AI 只生成 JSON；
 使用 --direction md-to-json 将 Markdown 转回 JSON；
 使用 --direction search --keyword <索引关键词> 查询 DECISIONS.md 或 FEATURES.md；
 使用 --direction latest --limit 5 查询 DECISIONS.md 或 FEATURES.md 中按日期排序的最新记录。
+使用 python check.py <目录> 递归检查指定目录下的四类 Markdown；
 脚本采用面向对象结构，由 DocumentHandler 及各文档处理器负责固定格式转换，由 DocumentRegistry 统一管理文档类型，由 IndexService 提供索引查询和最新记录查询。
 
 ## 目录结构
