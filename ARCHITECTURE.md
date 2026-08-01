@@ -6,7 +6,7 @@
 ## 目录结构
 - `feibi_singer/models.py`：定义 PipelineConfig、PipelineProtocol、StageContract、StageResult 和 PipelineReport，并声明五个阶段的输入输出、占位符和环境变量协议；
 - `feibi_singer/pipeline.py`：编排分离、歌词选择、ASR、歌词改写、ACE-Step、RVC 和报告汇总，负责写入 manifest、协议、校验和阶段产物；
-- `feibi_singer/timeline_pipeline.py`：默认真实执行器，检测原唱窗口，在约 15 秒目标附近按短窗 RMS 动态选择低能量切点，带重叠上下文逐段执行 ACE-Step、二次分离和 RVC，再交叉淡化、延迟对齐并混回原始伴奏；
+- `feibi_singer/timeline_pipeline.py`：默认真实执行器，检测原唱窗口，在约 15 秒目标附近按短窗 RMS 动态选择低能量切点；用宽上下文和逐秒 RMS 覆盖率筛选 ACE 人声候选，统一执行 RVC +4，再交叉淡化、延迟对齐并混回原始伴奏；
 - `feibi_singer/adapters.py`：统一处理 dry-run 阶段计划、真实 shell 命令执行、上下文渲染、环境变量注入、日志和输出存在性检查；
 - `feibi_singer/external.py`：wrapper 层阶段入口，读取阶段请求并执行 separation、ASR、LLM、ACE-Step、RVC 的 backend 命令，校验真实输出；
 - `feibi_singer/feibi_rules.py`：实现多语言启发式音节统计、菲比模式生成、逐行音节和结尾模式校验；
@@ -37,6 +37,6 @@
 - 当前音节统计是启发式实现；没有 LLM Key 时只能使用明确标记的 local_rule_fallback，不能声称云端 LLM 已执行；
 - ACE-Step 和 RVC 必须使用各自兼容的隔离 venv，模型和缓存统一放在 D 盘并由 .gitignore 排除；
 - RVC 只转换生成歌声轨，转换后再与生成伴奏混合，避免对整首伴奏做音色转换；
-- 默认真实方案必须保留原始伴奏，按原分离人声检测到的起止区间动态分段生成歌声并交叉淡化对齐；旧整曲直通方案只能显式启用；
+- 默认真实方案必须保留原始伴奏，按原分离人声检测到的起止区间动态分段生成歌声并交叉淡化对齐；ACE 候选必须通过逐秒 RMS 覆盖率门槛，所有片段统一执行 RVC +4；旧整曲直通方案只能显式启用；
 - RVC 模型和索引统一使用配置路径，示例默认指向仓库 models/rvc/；
 - ARCHITECTURE.md、PROGRESS.md、FEATURES.md、DECISIONS.md 必须通过 harness/harness_context.py 从 JSON 生成；FEATURES.md 和 DECISIONS.md 的读取及索引使用脚本；

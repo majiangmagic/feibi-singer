@@ -4,6 +4,7 @@ from feibi_singer.timeline_pipeline import (
     assign_segment_lyrics,
     build_segment_plan,
     calculate_vocal_gain_db,
+    parse_mean_volume_db,
     select_dynamic_split_points,
     select_vocal_window,
 )
@@ -11,6 +12,11 @@ from feibi_singer.timeline_pipeline import (
 
 def test_vocal_gain_matches_original_loudness():
     assert calculate_vocal_gain_db(-12.5, -20.7) == 8.2
+
+
+def test_parse_mean_volume_db():
+    assert parse_mean_volume_db("[Parsed_volumedetect] mean_volume: -25.3 dB") == -25.3
+    assert parse_mean_volume_db("mean_volume: -inf dB") == float("-inf")
 
 
 def test_select_vocal_window_uses_long_intro_and_outro_silence():
@@ -70,10 +76,23 @@ def test_segment_plan_adds_context_without_exceeding_window():
     plan = build_segment_plan(["cat", "dog", "pig"], [10.0, 20.0], 30.0)
 
     assert [(item.input_start, item.input_end) for item in plan] == [
-        (0.0, 11.5),
-        (8.5, 21.5),
-        (18.5, 30.0),
+        (0.0, 17.5),
+        (2.5, 27.5),
+        (12.5, 30.0),
     ]
     assert plan[0].lyrics == ("cat", "dog")
     assert plan[1].lyrics == ("cat", "dog", "pig")
     assert plan[2].lyrics == ("dog", "pig")
+
+
+def test_segment_plan_can_include_intro_and_outro_context():
+    plan = build_segment_plan(
+        ["cat", "dog"],
+        [10.0],
+        20.0,
+        leading_context=5.0,
+        trailing_context=6.0,
+    )
+
+    assert plan[0].input_start == -5.0
+    assert plan[-1].input_end == 26.0
