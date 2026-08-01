@@ -4,6 +4,7 @@ from feibi_singer.timeline_pipeline import (
     assign_segment_lyrics,
     build_segment_plan,
     calculate_vocal_gain_db,
+    has_preferred_vocal_coverage,
     parse_mean_volume_db,
     select_dynamic_split_points,
     select_vocal_window,
@@ -17,6 +18,12 @@ def test_vocal_gain_matches_original_loudness():
 def test_parse_mean_volume_db():
     assert parse_mean_volume_db("[Parsed_volumedetect] mean_volume: -25.3 dB") == -25.3
     assert parse_mean_volume_db("mean_volume: -inf dB") == float("-inf")
+
+
+def test_candidate_search_continues_until_full_vocal_coverage():
+    assert not has_preferred_vocal_coverage(0.85)
+    assert not has_preferred_vocal_coverage(0.999)
+    assert has_preferred_vocal_coverage(1.0)
 
 
 def test_select_vocal_window_uses_long_intro_and_outro_silence():

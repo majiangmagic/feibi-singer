@@ -20,6 +20,7 @@ STITCH_HANDLE_SECONDS = 0.25
 ACE_CANDIDATE_SEEDS = (44, 43, 45, 46, 47, 48, 49, 50)
 MIN_VOCAL_WINDOW_RMS_DB = -40.0
 MIN_VOCAL_COVERAGE = 0.85
+PREFERRED_VOCAL_COVERAGE = 1.0
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,10 @@ def measure_vocal_coverage(audio: Path, start: float, duration: float, window_se
         position += window_seconds
     active = sum(level >= MIN_VOCAL_WINDOW_RMS_DB for level in levels)
     return {"coverage": active / len(levels), "window_rms_db": levels}
+
+
+def has_preferred_vocal_coverage(coverage: float) -> bool:
+    return coverage >= PREFERRED_VOCAL_COVERAGE
 
 
 def select_dynamic_split_points(
@@ -341,7 +346,7 @@ def run_timeline_pipeline(
             coverage = measure_vocal_coverage(generated_vocals, core_offset, segment.core_end - segment.core_start)
             candidate = {"seed": seed, "vocals": generated_vocals, "rms_db": measure_mean_volume_db(generated_vocals), **coverage}
             candidates.append(candidate)
-            if candidate["coverage"] >= MIN_VOCAL_COVERAGE:
+            if has_preferred_vocal_coverage(candidate["coverage"]):
                 break
         selected_candidate = max(candidates, key=lambda candidate: (candidate["coverage"], candidate["rms_db"]))
         if selected_candidate["coverage"] < MIN_VOCAL_COVERAGE:

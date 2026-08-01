@@ -37,6 +37,6 @@
 - 当前音节统计是启发式实现；没有 LLM Key 时只能使用明确标记的 local_rule_fallback，不能声称云端 LLM 已执行；
 - ACE-Step 和 RVC 必须使用各自兼容的隔离 venv，模型和缓存统一放在 D 盘并由 .gitignore 排除；
 - RVC 只转换生成歌声轨，转换后再与生成伴奏混合，避免对整首伴奏做音色转换；
-- 默认真实方案必须保留原始伴奏，按原分离人声检测到的起止区间动态分段生成歌声并交叉淡化对齐；ACE 候选必须通过逐秒 RMS 覆盖率门槛，所有片段统一执行 RVC +4；旧整曲直通方案只能显式启用；
+- 默认真实方案必须保留原始伴奏，按原分离人声检测到的起止区间动态分段生成歌声并交叉淡化对齐；ACE 候选必须通过逐秒 RMS 覆盖率门槛并优先搜索到 100% 覆盖率，所有片段统一执行 RVC +4；旧整曲直通方案只能显式启用；
 - RVC 模型和索引统一使用配置路径，示例默认指向仓库 models/rvc/；
 - ARCHITECTURE.md、PROGRESS.md、FEATURES.md、DECISIONS.md 必须通过 harness/harness_context.py 从 JSON 生成；FEATURES.md 和 DECISIONS.md 的读取及索引使用脚本；

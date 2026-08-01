@@ -1,11 +1,11 @@
 {
   "current_status": {
     "latest_commit": {
-      "hash": "2666437",
-      "message": "增加动态分段歌声转换"
+      "hash": "8495680",
+      "message": "修复动态分段漏唱"
     },
-    "test_status": "项目独立 Python 3.11 venv 中 19 项 pytest 通过；unhappy v4 动态分段、候选筛选、RVC +4、拼接和完整混音端到端完成",
-    "lint": "5 段逐秒 RMS 覆盖率为 100%/92.3%/100%/85.7%/100%；最终 WAV/MP3 均为 98.246542 秒且无异常长静音"
+    "test_status": "20 项 pytest 通过；候选搜索现优先达到 100% 覆盖率，新版 unhappy 已完成端到端生成",
+    "lint": "5 段所选覆盖率均为 100%；第 4 段 56.7-70.4 秒无持续 0.25 秒静音，最终 WAV/MP3 均为 98.246542 秒"
   },
   "completed": [
     "已用 Demucs CUDA 对用户 MP3 和 ACE-Step 输出完成真实人声/伴奏分离",
@@ -15,20 +15,21 @@
     "已用 7.5 秒上下文、0.25 秒拼接把手和逐秒 RMS 门槛完成 5 段生成，统一使用 RVC +4 并动态应用 +6.7 dB 人声增益"
   ],
   "in_progress": [
-    "等待用户试听 runs/unhappy_context_plus4_v4/final_feibi_song.wav 后决定是否验收 F22"
+    "用户试听确认新版唱声连续性改善，但目标词发音偏离“菲比”，需改进 ACE 中文发音约束和候选筛选"
   ],
   "known_issues": [
     "没有 CloudMist/OpenAI API Key，本次歌词改写使用 local_rule_fallback，F12 仍未验收",
     "CTranslate2 CUDA 缺 cublas64_12.dll，本次 faster-whisper 使用 CPU int8",
     "ACE-Step 和 RVC 依赖分别要求 Python 3.11 与 Python 3.10，必须保持独立 venv",
     "动态响度和逐秒覆盖率检查依赖 ffmpeg，部署环境必须提供 ffmpeg；CloudMist 云端 LLM 仍需 API Key",
-    "ACE-Step 固定 seed 仍可能出现候选波动，因此当前最多尝试 seed 44、43、45-50"
+    "ACE-Step 固定 seed 仍可能出现候选波动，当前最多尝试 seed 44、43、45-50；RVC +4 会相对削弱 4 kHz 以上能量",
+    "当前覆盖率门槛只能保证唱声连续，不能识别“菲比”是否发音标准；新版存在目标词发音偏离"
   ],
   "next_steps": [
-    "用户试听 v4 完整 WAV 或 MP3",
-    "重点检查 30 秒后歌词覆盖、40 秒后音质和四个动态切点连续性",
-    "根据试听结论决定是否调整候选门槛或上下文边界",
-    "试听通过后标记 F22 passing 并本地提交",
+    "对比 ACE 原始输出与 RVC 输出，确认发音偏差最早出现的阶段",
+    "研究 ACE 中文歌词的拼音、分词或音节边界约束，减少“菲比”发音漂移",
+    "设计可试听的发音候选对照，不再只按 RMS 覆盖率选取",
+    "发音和音色试听通过后再标记 F22 passing",
     "明确允许后才推送"
   ]
 }
