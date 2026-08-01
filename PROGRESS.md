@@ -3,9 +3,9 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `3b65bec`（跑通真实菲比演唱链路）
-- 测试状态：项目独立 Python 3.11 venv 中 14 项 pytest 通过；真实 98.2 秒音频完成时间轴对齐、动态 LUFS 人声匹配、RVC 和原始伴奏混音验证
-- Lint：默认真实入口按原人声 LUFS 动态计算增益；本次实际从 -20.7 LUFS 匹配到 -12.5 LUFS，应用 +8.2 dB
+- 最新 commit: `a4a32aa`（动态匹配原人声响度）
+- 测试状态：项目独立 Python 3.11 venv 中 17 项 pytest 和 Harness 检查通过；真实 98.2 秒 unhappy 已完成 5 段动态 ACE-Step/RVC 生成，但用户试听未通过
+- Lint：动态切点为内部 14.04、26.58、40.26、53.96 秒；文件指标正常，但用户认为每段均弱于旧单段生成的前 16 秒
 
 ### 已完成
 - [x] 已用 Demucs CUDA 对用户 MP3 和 ACE-Step 输出完成真实人声/伴奏分离
@@ -15,16 +15,18 @@
 - [x] 已将原固定 2 dB 改为原人声 LUFS 100% 动态匹配，本次应用 +8.2 dB
 
 ### 进行中
-- [ ] 继续完善默认时间轴路径的安装配置，并补充 CloudMist API Key 后验证云端 LLM 分支
+- [ ] 分析动态短片段均弱于旧单段前 16 秒的原因，区分 ACE 条件、歌词分配、Demucs 和 RVC 影响
 
 ### 已知问题
 - 没有 CloudMist/OpenAI API Key，本次歌词改写使用 local_rule_fallback，F12 仍未验收；
 - CTranslate2 CUDA 缺 cublas64_12.dll，本次 faster-whisper 使用 CPU int8；
 - ACE-Step 和 RVC 依赖分别要求 Python 3.11 与 Python 3.10，必须保持独立 venv；
-- 动态响度匹配依赖 ffmpeg ebur128，部署环境必须提供 ffmpeg；CloudMist 云端 LLM 仍需 API Key。
+- 动态响度匹配依赖 ffmpeg ebur128，部署环境必须提供 ffmpeg；CloudMist 云端 LLM 仍需 API Key；
+- 旧长段 ACE-Step/RVC 产物约从最终 40 秒开始出现可闻音质退化；新动态分段版本每段质量均弱于旧单段前 16 秒。
 
 ### 下一步
-1. 补齐默认时间轴方案的一键环境安装和模型准备说明；
-2. 补齐 config.example.json 的独立 venv engine 命令和基础模型路径；
-3. 获得 LLM API Key 后验证 CloudMist 分支并替换 local_rule_fallback；
-4. 试听最终音频并根据实际听感调整 ACE cover strength、RVC index rate 和人声混音比例。
+1. 分别对比旧单段前 16 秒与新各段的 ACE 原始输出；
+2. 对比 Demucs 分离前后和 RVC 前后，定位质量最早下降阶段；
+3. 检查短片段歌词密度、上下文长度和 ACE duration 量化影响；
+4. 设计最小参数对照实验并重新生成试听版本；
+5. 用户试听通过后再标记 F22 passing，明确允许后才推送。

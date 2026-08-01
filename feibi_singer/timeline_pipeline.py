@@ -1,13 +1,30 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
+import wave
+from array import array
+from dataclasses import dataclass
 from pathlib import Path
 
-from .feibi_rules import rewrite_lyrics
+from .feibi_rules import rewrite_lyrics, syllable_count
+
+SEGMENT_TARGET_SECONDS = 15.0
+SEGMENT_SEARCH_SECONDS = 2.5
+SEGMENT_CONTEXT_SECONDS = 1.5
+
+
+@dataclass(frozen=True)
+class SegmentPlan:
+    core_start: float
+    core_end: float
+    input_start: float
+    input_end: float
+    lyrics: tuple[str, ...]
 
 def measure_integrated_lufs(audio: Path, start: float = 0.0, duration: float | None = None) -> float:
     command = ["ffmpeg", "-hide_banner", "-ss", str(start)]
@@ -23,6 +40,110 @@ def measure_integrated_lufs(audio: Path, start: float = 0.0, duration: float | N
 
 def calculate_vocal_gain_db(original_lufs: float, converted_lufs: float) -> float:
     return round(original_lufs - converted_lufs, 2)
+
+
+def select_dynamic_split_points(
+    rms_values: list[float],
+    sample_rate: int,
+    duration: float,
+    *,
+    target_seconds: float = SEGMENT_TARGET_SECONDS,
+    search_seconds: float = SEGMENT_SEARCH_SECONDS,
+) -> list[float]:
+    segment_count = max(1, math.ceil(duration / target_seconds))
+    target_spacing = duration / segment_count
+    points = []
+    for point_index in range(1, segment_count):
+        target = target_spacing * point_index
+        start = max(0, round((target - search_seconds) * sample_rate))
+        end = min(len(rms_values), round((target + search_seconds) * sample_rate) + 1)
+        if start >= end:
+            break
+        best = min(
+            range(start, end),
+            key=lambda index: (
+                20 * math.log10(max(rms_values[index], 1e-9))
+                + 1.5 * abs(index / sample_rate - target),
+                abs(index / sample_rate - target),
+            ),
+        )
+        point = best / sample_rate
+        if not points or point - points[-1] >= target_spacing / 2:
+            points.append(round(point, 3))
+    return points
+
+
+def assign_segment_lyrics(lines: list[str], split_points: list[float], duration: float) -> list[tuple[str, ...]]:
+    weights = [max(1, syllable_count(line)) for line in lines]
+    total_weight = sum(weights)
+    line_ends = []
+    cumulative = 0
+    for weight in weights:
+        cumulative += weight
+        line_ends.append(duration * cumulative / total_weight)
+
+    segments = []
+    line_index = 0
+    for segment_end in [*split_points, duration]:
+        segment_lines = []
+        while line_index < len(lines) and (line_ends[line_index] <= segment_end or not segment_lines):
+            segment_lines.append(lines[line_index])
+            line_index += 1
+        segments.append(tuple(segment_lines))
+    if line_index < len(lines):
+        segments[-1] += tuple(lines[line_index:])
+    return segments
+
+
+def build_segment_plan(lines: list[str], split_points: list[float], duration: float) -> list[SegmentPlan]:
+    boundaries = [0.0, *split_points, duration]
+    weights = [max(1, syllable_count(line)) for line in lines]
+    total_weight = sum(weights)
+    line_ranges = []
+    cumulative = 0
+    for line, weight in zip(lines, weights):
+        line_start = duration * cumulative / total_weight
+        cumulative += weight
+        line_end = duration * cumulative / total_weight
+        line_ranges.append((line_start, line_end, line))
+
+    plans = []
+    for start, end in zip(boundaries, boundaries[1:]):
+        input_start = max(0.0, start - SEGMENT_CONTEXT_SECONDS)
+        input_end = min(duration, end + SEGMENT_CONTEXT_SECONDS)
+        segment_lyrics = tuple(
+            line for line_start, line_end, line in line_ranges
+            if line_end > input_start and line_start < input_end
+        )
+        plans.append(SegmentPlan(start, end, input_start, input_end, segment_lyrics))
+    return plans
+
+
+def measure_vocal_rms(audio: Path, start: float, duration: float, sample_rate: int = 50) -> list[float]:
+    with wave.open(str(audio), "rb") as source:
+        if source.getsampwidth() != 2:
+            raise RuntimeError(f"dynamic segmentation requires 16-bit PCM vocals: {audio}")
+        channels = source.getnchannels()
+        source_rate = source.getframerate()
+        frames_per_window = max(1, round(source_rate / sample_rate))
+        source.setpos(min(source.getnframes(), round(start * source_rate)))
+        remaining = round(duration * source_rate)
+        values = []
+        while remaining > 0:
+            frame_count = min(frames_per_window, remaining)
+            samples = array("h")
+            samples.frombytes(source.readframes(frame_count))
+            if not samples:
+                break
+            frame_total = len(samples) // channels
+            energy = 0.0
+            for frame in range(frame_total):
+                offset = frame * channels
+                mono = sum(samples[offset : offset + channels]) / channels / 32768.0
+                energy += mono * mono
+            values.append(math.sqrt(energy / max(1, frame_total)))
+            remaining -= frame_count
+    return values
 
 
 def select_vocal_window(silencedetect_output: str, duration: float) -> tuple[float, float]:
@@ -115,37 +236,72 @@ def run_timeline_pipeline(
     if not validation["all_passed"]:
         raise RuntimeError("rewritten lyrics failed validation")
 
-    ace_dir = stages / "ace_step_lyric_edit"
-    ace_source = ace_dir / "source_vocal_window.wav"
-    ace_dir.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(vocal_start), "-t", str(vocal_duration), "-i", str(input_audio), "-c:a", "pcm_s16le", str(ace_source)], check=True)
-    ace_output = ace_dir / "ace_step_output.wav"
+    rms_values = measure_vocal_rms(vocals, vocal_start, vocal_duration)
+    split_points = select_dynamic_split_points(rms_values, 50, vocal_duration)
+    segment_plan = build_segment_plan(rewritten, split_points, vocal_duration)
+    segmented_dir = stages / "segmented_voice_conversion"
+    segmented_dir.mkdir(parents=True, exist_ok=True)
     ace_env = env | {"ACESTEP_CHECKPOINTS_DIR": str(repo_root / "models" / "ace_step" / "checkpoints")}
-    subprocess.run(
-        [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(rewritten_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--duration", str(vocal_duration), "--cover-strength", "0.95"],
-        cwd=repo_root,
-        env=ace_env,
-        check=True,
-    )
-
-    generated_demucs = stages / "generated_song_separation"
-    subprocess.run(
-        [str(rvc_python), "-m", "demucs.separate", "--two-stems", "vocals", "-n", "htdemucs", "-d", "cuda", "-o", str(generated_demucs), "--", str(ace_output)],
-        cwd=repo_root,
-        env=env,
-        check=True,
-    )
-    generated_vocals = next(generated_demucs.rglob("vocals.wav"))
-
     rvc_dir = stages / "rvc_voice_conversion"
-    converted = rvc_dir / "converted_vocals.wav"
     rvc_dir.mkdir(parents=True, exist_ok=True)
     rvc_assets = repo_root / "models" / "rvc" / "assets"
     rvc_env = env | {"HOME": str(repo_root / "models" / "rvc" / "home"), "USERPROFILE": str(repo_root / "models" / "rvc" / "home")}
+
+    converted_segments = []
+    segment_reports = []
+    for index, segment in enumerate(segment_plan, start=1):
+        segment_dir = segmented_dir / f"segment_{index:02d}"
+        segment_dir.mkdir(parents=True, exist_ok=True)
+        segment_duration = segment.input_end - segment.input_start
+        ace_source = segment_dir / "source.wav"
+        segment_lyrics_path = segment_dir / "lyrics.txt"
+        ace_output = segment_dir / "ace_step_output.wav"
+        segment_lyrics_path.write_text("\n".join(segment.lyrics) + "\n", encoding="utf-8")
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-ss", str(vocal_start + segment.input_start), "-t", str(segment_duration), "-i", str(input_audio), "-c:a", "pcm_s16le", str(ace_source)],
+            check=True,
+        )
+        subprocess.run(
+            [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(segment_lyrics_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--duration", str(segment_duration), "--cover-strength", "0.95", "--seed", "42"],
+            cwd=repo_root,
+            env=ace_env,
+            check=True,
+        )
+        generated_demucs = segment_dir / "demucs"
+        subprocess.run(
+            [str(rvc_python), "-m", "demucs.separate", "--two-stems", "vocals", "-n", "htdemucs", "-d", "cuda", "-o", str(generated_demucs), "--", str(ace_output)],
+            cwd=repo_root,
+            env=env,
+            check=True,
+        )
+        generated_vocals = next(generated_demucs.rglob("vocals.wav"))
+        converted = segment_dir / "converted_vocals.wav"
+        subprocess.run(
+            [str(rvc_python), str(repo_root / "scripts" / "feibi_rvc_infer.py"), "--source-song", str(generated_vocals), "--model", str(repo_root / "models" / "rvc" / "feibiv1.0.0_e200_s1600.pth"), "--index", str(repo_root / "models" / "rvc" / "feibiv1.0.0_v2.index"), "--runtime-root", str(repo_root / "models" / "rvc" / "runtime"), "--hubert-model", str(rvc_assets / "hubert_base.pt"), "--rmvpe-model", str(rvc_assets / "rmvpe.pt"), "--output", str(converted)],
+            cwd=repo_root,
+            env=rvc_env,
+            check=True,
+        )
+        normalized = segment_dir / "converted_normalized.wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", str(converted), "-af", f"apad,atrim=duration={segment_duration}", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s24le", str(normalized)],
+            check=True,
+        )
+        converted_segments.append(normalized)
+        segment_reports.append({"index": index, "core_start": segment.core_start, "core_end": segment.core_end, "input_start": segment.input_start, "input_end": segment.input_end, "lyrics": list(segment.lyrics)})
+
+    converted = rvc_dir / "converted_vocals.wav"
+    inputs = [item for path in converted_segments for item in ("-i", str(path))]
+    filters = []
+    previous = "[0:a]"
+    for index, segment in enumerate(segment_plan[1:], start=1):
+        overlap = (segment.core_start - segment.input_start) + (segment_plan[index - 1].input_end - segment_plan[index - 1].core_end)
+        output = f"[mix{index}]"
+        filters.append(f"{previous}[{index}:a]acrossfade=d={overlap}:c1=tri:c2=tri{output}")
+        previous = output
+    filters.append(f"{previous}apad,atrim=duration={vocal_duration}[out]")
     subprocess.run(
-        [str(rvc_python), str(repo_root / "scripts" / "feibi_rvc_infer.py"), "--source-song", str(generated_vocals), "--model", str(repo_root / "models" / "rvc" / "feibiv1.0.0_e200_s1600.pth"), "--index", str(repo_root / "models" / "rvc" / "feibiv1.0.0_v2.index"), "--runtime-root", str(repo_root / "models" / "rvc" / "runtime"), "--hubert-model", str(rvc_assets / "hubert_base.pt"), "--rmvpe-model", str(rvc_assets / "rmvpe.pt"), "--output", str(converted)],
-        cwd=repo_root,
-        env=rvc_env,
+        ["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filters), "-map", "[out]", "-c:a", "pcm_s24le", str(converted)],
         check=True,
     )
 
@@ -166,6 +322,6 @@ def run_timeline_pipeline(
     final_mp3 = output_dir / "final_feibi_song.mp3"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(final_song), "-c:a", "libmp3lame", "-b:a", "320k", str(final_mp3)], check=True)
 
-    report = {"status": "completed", "strategy": "timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "mix": {"vocal_gain_db": vocal_gain_db, "gain_mode": "match_original_vocal_integrated_lufs", "original_vocal_lufs": original_lufs, "converted_vocal_lufs": converted_lufs}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
+    report = {"status": "completed", "strategy": "dynamic_segmented_timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "segmentation": {"target_seconds": SEGMENT_TARGET_SECONDS, "search_seconds": SEGMENT_SEARCH_SECONDS, "context_seconds": SEGMENT_CONTEXT_SECONDS, "split_points": split_points, "segments": segment_reports}, "mix": {"vocal_gain_db": vocal_gain_db, "gain_mode": "match_original_vocal_integrated_lufs", "original_vocal_lufs": original_lufs, "converted_vocal_lufs": converted_lufs}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "segmented_vocals": str(converted), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
     (output_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

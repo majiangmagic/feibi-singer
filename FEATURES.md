@@ -328,3 +328,19 @@
   4. 确认最终混音使用原始伴奏并保持原曲时长。。
 - 验证证据：统一 CLI 默认入口对真实 unhappy 音频自动检测到约 16.44-82.55 秒演唱窗口，report.json 返回 timeline_aligned_original_instrumental；动态测得原始人声 -12.5 LUFS、RVC 人声 -20.7 LUFS，自动应用 +8.2 dB，使两者达到 100% LUFS 匹配；动态增益测试及全部 14 项测试通过。。
 - 备注：scripts/feibi_pipeline.py 非 dry-run 默认调用 timeline_pipeline；默认混音按原始人声演唱区间的 LUFS 动态匹配，不再使用固定 2 dB；旧整曲 ACE/RVC 路径仅通过 --legacy-direct-pipeline 显式启用。。
+
+## F22：动态分段 ACE-Step 与 RVC
+
+- 索引：动态切点, 分段生成, ACE-Step, RVC, 交叉淡化
+- 日期：2026-08-01
+- 优先级：1
+- 所属区域：`核心流程`
+- 用户可见行为：系统在约 15 秒目标附近寻找低能量拼接点，带重叠上下文逐段执行 ACE-Step 和 RVC，再将转换人声平滑拼回完整原伴奏。。
+- 状态：`in_progress`
+- 验证步骤：
+  1. 验证动态切点和歌词分配单元测试。；
+  2. 验证分段命令、产物和报告集成流程。；
+  3. 使用 unhappy 完整生成 WAV 和 MP3。；
+  4. 由用户试听确认后完成验收。。
+- 验证证据：17 项 pytest 和 Harness 检查通过；unhappy 已按内部 14.04、26.58、40.26、53.96 秒动态低能量切点完成 5 段 ACE-Step、Demucs、RVC 和交叉淡化，生成 98.246542 秒 WAV/MP3；用户试听认为 5 段质量均弱于旧单段生成的前 16 秒，暂未验收。。
+- 备注：当前实现作为本地可复现检查点保存但不推送；下一步需定位短片段 ACE 条件、歌词密度、Demucs 和 RVC 中最早发生的质量下降。。

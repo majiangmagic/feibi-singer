@@ -1,6 +1,12 @@
 import pytest
 
-from feibi_singer.timeline_pipeline import calculate_vocal_gain_db, select_vocal_window
+from feibi_singer.timeline_pipeline import (
+    assign_segment_lyrics,
+    build_segment_plan,
+    calculate_vocal_gain_db,
+    select_dynamic_split_points,
+    select_vocal_window,
+)
 
 
 def test_vocal_gain_matches_original_loudness():
@@ -39,3 +45,35 @@ silence_end: 30.0 | silence_duration: 20.0
 
     with pytest.raises(RuntimeError, match="invalid detected vocal window"):
         select_vocal_window(output, 30.0)
+
+
+def test_dynamic_split_points_choose_low_energy_near_each_target():
+    rms = [0.5] * 700
+    rms[120] = 0.01
+    rms[270] = 0.02
+    rms[380] = 0.01
+    rms[530] = 0.02
+
+    assert select_dynamic_split_points(rms, 10, 65.0) == [12.0, 27.0, 38.0, 53.0]
+
+
+def test_segment_lyrics_are_contiguous_and_complete():
+    lines = ["one two", "three", "four five six", "seven", "eight nine"]
+
+    assigned = assign_segment_lyrics(lines, [4.0, 8.0], 12.0)
+
+    assert [line for segment in assigned for line in segment] == lines
+    assert all(segment for segment in assigned)
+
+
+def test_segment_plan_adds_context_without_exceeding_window():
+    plan = build_segment_plan(["cat", "dog", "pig"], [10.0, 20.0], 30.0)
+
+    assert [(item.input_start, item.input_end) for item in plan] == [
+        (0.0, 11.5),
+        (8.5, 21.5),
+        (18.5, 30.0),
+    ]
+    assert plan[0].lyrics == ("cat", "dog")
+    assert plan[1].lyrics == ("cat", "dog", "pig")
+    assert plan[2].lyrics == ("dog", "pig")
