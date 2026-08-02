@@ -21,6 +21,13 @@ ACE_CANDIDATE_SEEDS = (44, 43, 45, 46, 47, 48, 49, 50)
 MIN_VOCAL_WINDOW_RMS_DB = -40.0
 MIN_VOCAL_COVERAGE = 0.85
 PREFERRED_VOCAL_COVERAGE = 1.0
+RVC_F0_CHANGE = 2
+ACE_CAPTION = (
+    "Studio indie rock vocal. Clear standard Mandarin diction and lyric intelligibility "
+    "are the highest priority. Restrained, clean, even singing; preserve the original "
+    "melody and rhythm. No live-concert delivery, shouting, belting, rasp, growling, "
+    "ad-libs, or exaggerated emotion."
+)
 
 
 @dataclass(frozen=True)
@@ -327,7 +334,7 @@ def run_timeline_pipeline(
             ace_output = candidate_dir / "ace_step_output.wav"
             if not ace_output.exists():
                 subprocess.run(
-                    [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(segment_lyrics_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--duration", str(segment_duration), "--cover-strength", "0.95", "--seed", str(seed)],
+                    [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(segment_lyrics_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--caption", ACE_CAPTION, "--duration", str(segment_duration), "--cover-strength", "0.95", "--seed", str(seed)],
                     cwd=repo_root,
                     env=ace_env,
                     check=True,
@@ -354,7 +361,7 @@ def run_timeline_pipeline(
         generated_vocals = selected_candidate["vocals"]
         converted = segment_dir / "converted_vocals.wav"
         subprocess.run(
-            [str(rvc_python), str(repo_root / "scripts" / "feibi_rvc_infer.py"), "--source-song", str(generated_vocals), "--model", str(repo_root / "models" / "rvc" / "feibiv1.0.0_e200_s1600.pth"), "--index", str(repo_root / "models" / "rvc" / "feibiv1.0.0_v2.index"), "--runtime-root", str(repo_root / "models" / "rvc" / "runtime"), "--hubert-model", str(rvc_assets / "hubert_base.pt"), "--rmvpe-model", str(rvc_assets / "rmvpe.pt"), "--f0-change", "4", "--output", str(converted)],
+            [str(rvc_python), str(repo_root / "scripts" / "feibi_rvc_infer.py"), "--source-song", str(generated_vocals), "--model", str(repo_root / "models" / "rvc" / "feibiv1.0.0_e200_s1600.pth"), "--index", str(repo_root / "models" / "rvc" / "feibiv1.0.0_v2.index"), "--runtime-root", str(repo_root / "models" / "rvc" / "runtime"), "--hubert-model", str(rvc_assets / "hubert_base.pt"), "--rmvpe-model", str(rvc_assets / "rmvpe.pt"), "--f0-change", str(RVC_F0_CHANGE), "--output", str(converted)],
             cwd=repo_root,
             env=rvc_env,
             check=True,
@@ -371,7 +378,7 @@ def run_timeline_pipeline(
             check=True,
         )
         converted_segments.append(normalized)
-        segment_reports.append({"index": index, "core_start": segment.core_start, "core_end": segment.core_end, "input_start": segment.input_start, "input_end": segment.input_end, "lyrics": list(segment.lyrics), "ace_candidates": [{"seed": item["seed"], "rms_db": item["rms_db"], "coverage": item["coverage"], "window_rms_db": item["window_rms_db"]} for item in candidates], "selected_seed": selected_candidate["seed"], "rvc_f0_change": 4})
+        segment_reports.append({"index": index, "core_start": segment.core_start, "core_end": segment.core_end, "input_start": segment.input_start, "input_end": segment.input_end, "lyrics": list(segment.lyrics), "ace_candidates": [{"seed": item["seed"], "rms_db": item["rms_db"], "coverage": item["coverage"], "window_rms_db": item["window_rms_db"]} for item in candidates], "selected_seed": selected_candidate["seed"], "rvc_f0_change": RVC_F0_CHANGE})
 
     converted = rvc_dir / "converted_vocals.wav"
     inputs = [item for path in converted_segments for item in ("-i", str(path))]
