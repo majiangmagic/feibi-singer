@@ -3,6 +3,7 @@ import pytest
 from feibi_singer.timeline_pipeline import (
     ACE_CAPTION,
     RVC_F0_CHANGE,
+    resolve_caption,
     assign_segment_lyrics,
     build_segment_plan,
     calculate_vocal_gain_db,
@@ -20,6 +21,12 @@ def test_dynamic_segments_use_locally_approved_rvc_pitch_shift():
 def test_ace_prioritizes_clear_studio_diction_over_live_delivery():
     assert "diction and lyric intelligibility are the highest priority" in ACE_CAPTION
     assert "No live-concert delivery" in ACE_CAPTION
+
+
+def test_caption_override_is_optional_and_preserves_default():
+    assert resolve_caption(None) == ACE_CAPTION
+    assert resolve_caption("   ") == ACE_CAPTION
+    assert resolve_caption("custom studio caption") == "custom studio caption"
 
 
 def test_vocal_gain_matches_original_loudness():

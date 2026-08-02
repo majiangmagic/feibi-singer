@@ -30,6 +30,12 @@ ACE_CAPTION = (
 )
 
 
+def resolve_caption(caption: str | None = None) -> str:
+    """Use a one-run caption override, otherwise preserve the approved default."""
+
+    return caption.strip() if caption and caption.strip() else ACE_CAPTION
+
+
 @dataclass(frozen=True)
 class SegmentPlan:
     core_start: float
@@ -226,6 +232,7 @@ def run_timeline_pipeline(
     lyrics: list[str],
     *,
     use_asr_fallback: bool = True,
+    caption: str | None = None,
 ) -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     project_python = repo_root / ".venv" / "Scripts" / "python.exe"
@@ -334,7 +341,7 @@ def run_timeline_pipeline(
             ace_output = candidate_dir / "ace_step_output.wav"
             if not ace_output.exists():
                 subprocess.run(
-                    [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(segment_lyrics_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--caption", ACE_CAPTION, "--duration", str(segment_duration), "--cover-strength", "0.95", "--seed", str(seed)],
+                    [str(ace_python), str(repo_root / "scripts" / "feibi_ace_step_v15.py"), "--source-audio", str(ace_source), "--lyrics", str(segment_lyrics_path), "--output", str(ace_output), "--runtime-root", str(repo_root / "models" / "ace_step" / "runtime"), "--checkpoints-dir", str(repo_root / "models" / "ace_step" / "checkpoints"), "--caption", resolve_caption(caption), "--duration", str(segment_duration), "--cover-strength", "0.95", "--seed", str(seed)],
                     cwd=repo_root,
                     env=ace_env,
                     check=True,

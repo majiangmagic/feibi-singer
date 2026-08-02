@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-asr-fallback", action="store_true", help="skip ASR fallback when lyrics are provided")
     parser.add_argument("--legacy-direct-pipeline", action="store_true", help="use the old whole-song ACE/RVC path")
+    parser.add_argument("--caption", help="override the default ACE-Step caption for this run")
     args = parser.parse_args()
 
     cfg = PipelineConfig()
@@ -37,6 +38,7 @@ def main() -> int:
             args.output_dir.resolve(),
             lines,
             use_asr_fallback=not args.no_asr_fallback,
+            caption=args.caption,
         )
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
