@@ -233,6 +233,7 @@ def run_timeline_pipeline(
     *,
     use_asr_fallback: bool = True,
     caption: str | None = None,
+    seed_plan: tuple[int, ...] | None = None,
 ) -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     project_python = repo_root / ".venv" / "Scripts" / "python.exe"
@@ -321,6 +322,9 @@ def run_timeline_pipeline(
     rvc_assets = repo_root / "models" / "rvc" / "assets"
     rvc_env = env | {"HOME": str(repo_root / "models" / "rvc" / "home"), "USERPROFILE": str(repo_root / "models" / "rvc" / "home")}
 
+    if seed_plan is not None and len(seed_plan) != len(segment_plan):
+        raise ValueError(f"seed plan must contain exactly {len(segment_plan)} seeds, got {len(seed_plan)}")
+
     converted_segments = []
     segment_reports = []
     for index, segment in enumerate(segment_plan, start=1):
@@ -335,7 +339,8 @@ def run_timeline_pipeline(
             check=True,
         )
         candidates = []
-        for seed in ACE_CANDIDATE_SEEDS:
+        candidate_seeds = (seed_plan[index - 1],) if seed_plan is not None else ACE_CANDIDATE_SEEDS
+        for seed in candidate_seeds:
             candidate_dir = segment_dir / "candidates" / f"seed_{seed}"
             candidate_dir.mkdir(parents=True, exist_ok=True)
             ace_output = candidate_dir / "ace_step_output.wav"
@@ -419,6 +424,6 @@ def run_timeline_pipeline(
     final_mp3 = output_dir / "final_feibi_song.mp3"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(final_song), "-c:a", "libmp3lame", "-b:a", "320k", str(final_mp3)], check=True)
 
-    report = {"status": "completed", "strategy": "dynamic_segmented_timeline_aligned_original_instrumental", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "segmentation": {"target_seconds": SEGMENT_TARGET_SECONDS, "search_seconds": SEGMENT_SEARCH_SECONDS, "context_seconds": SEGMENT_CONTEXT_SECONDS, "stitch_handle_seconds": STITCH_HANDLE_SECONDS, "split_points": split_points, "segments": segment_reports}, "mix": {"vocal_gain_db": vocal_gain_db, "gain_mode": "match_original_vocal_integrated_lufs", "original_vocal_lufs": original_lufs, "converted_vocal_lufs": converted_lufs}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "segmented_vocals": str(converted), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
+    report = {"status": "completed", "strategy": "dynamic_segmented_timeline_aligned_original_instrumental", "ace_caption": resolve_caption(caption), "seed_mode": "fixed_plan" if seed_plan is not None else "coverage_search", "input_audio": str(input_audio), "lyrics_source": "user_provided" if lyrics else "asr_fallback", "vocal_window": {"start": vocal_start, "end": vocal_end, "delay_ms": delay_ms}, "segmentation": {"target_seconds": SEGMENT_TARGET_SECONDS, "search_seconds": SEGMENT_SEARCH_SECONDS, "context_seconds": SEGMENT_CONTEXT_SECONDS, "stitch_handle_seconds": STITCH_HANDLE_SECONDS, "split_points": split_points, "segments": segment_reports}, "mix": {"vocal_gain_db": vocal_gain_db, "gain_mode": "match_original_vocal_integrated_lufs", "original_vocal_lufs": original_lufs, "converted_vocal_lufs": converted_lufs}, "outputs": {"final_song": str(final_song), "final_mp3": str(final_mp3), "segmented_vocals": str(converted), "aligned_vocals": str(aligned), "original_instrumental": str(instrumental)}}
     (output_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

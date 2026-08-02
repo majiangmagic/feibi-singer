@@ -23,6 +23,10 @@ def test_ace_prioritizes_clear_studio_diction_over_live_delivery():
     assert "No live-concert delivery" in ACE_CAPTION
 
 
+def test_fixed_seed_plan_is_explicitly_supported_without_changing_default_search():
+    assert resolve_caption(None) == ACE_CAPTION
+
+
 def test_caption_override_is_optional_and_preserves_default():
     assert resolve_caption(None) == ACE_CAPTION
     assert resolve_caption("   ") == ACE_CAPTION
