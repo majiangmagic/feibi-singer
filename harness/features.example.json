@@ -538,14 +538,14 @@
       "date": "2026-08-03",
       "priority": 1,
       "area": "交互式分段生成",
-      "user_visible_behavior": "本地 UI 读取既有分段运行，允许逐段修改 ACE-Step seed、caption 提示词和预设歌词，重新生成并试听 ACE；再修改每段 RVC 动态升调并试听，选定各段最佳结果后，与原始伴奏合并为完整歌曲。",
+      "user_visible_behavior": "本地 UI 读取既有分段运行，允许逐段修改 ACE-Step seed、caption 提示词和预设歌词，分别试听 ACE 原始生成旋律、ACE 人声叠加原旋律伴奏和 ACE 生成旋律；再修改每段 RVC 动态升调，分别试听 RVC 人声、RVC 叠加原旋律伴奏和纯人声，选定各段最佳结果后，与原始伴奏合并为完整歌曲。",
       "status": "passing",
       "verification_steps": [
         "单元测试工作台状态持久化、输入校验和 ACE/RVC 命令构造。",
         "用真实 unhappy v10 运行导入五段缓存候选，确认全部片段并通过工作台完成最终合并。",
         "Start the local Gradio UI and verify segment switching, media paths, candidate loading, approval persistence, and final merge outputs in the browser."
       ],
-      "verification_evidence": "30 pytest tests passed. The five cached candidates from unhappy_custom_fixed_v10 were merged through SegmentWorkbench into WAV, MP3, and JSON; original vocals measured -12.5 LUFS, converted vocals -17.9 LUFS, with +5.4 dB automatic gain. In Gradio 6.2.0 at 127.0.0.1:7860, browser verification covered seeds 44/46/45/48/49, RVC +2, all five approvals, and the final 98-second WAV/MP3 players plus downloadable JSON report.",
+      "verification_evidence": "31 pytest tests passed. The five cached candidates from unhappy_custom_fixed_v10 were previewed with generated-melody and original-instrumental mixes for ACE and RVC; the workbench produced all four preview paths for every segment. Existing browser verification covered final merge outputs; the restarted UI exposes separate original-melody and generated-melody preview players.",
       "notes": "第一版从已完成时间轴运行开始，复用原始分段、演唱时间和原伴奏；ACE-Step 与 RVC 继续使用各自隔离 venv。"
     }
   ]

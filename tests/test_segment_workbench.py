@@ -83,6 +83,27 @@ def test_ace_command_uses_segment_duration_and_custom_controls(tmp_path):
     assert command[command.index("--lyrics") + 1] == str(lyrics)
 
 
+def test_preview_methods_return_original_melody_and_generated_melody_paths(tmp_path, monkeypatch):
+    run_dir = make_run(tmp_path)
+    workbench = SegmentWorkbench(run_dir)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        Path(command[-1]).parent.mkdir(parents=True, exist_ok=True)
+        Path(command[-1]).write_bytes(b"preview")
+
+    monkeypatch.setattr("feibi_singer.segment_workbench._run", fake_run)
+    ace = workbench.ace_preview(1, "source-seed-44")
+    rvc = workbench.rvc_preview(1, "source-seed-44", "source-f0-+2")
+
+    assert Path(ace["with_original"]).exists()
+    assert Path(ace["generated_melody"]).exists()
+    assert Path(rvc["with_original"]).exists()
+    assert Path(rvc["vocal_only"]).exists()
+    assert len(calls) == 3
+
+
 def test_rvc_command_uses_per_segment_pitch(tmp_path):
     workbench = SegmentWorkbench(make_run(tmp_path))
     command = workbench.rvc_command(tmp_path / "vocals.wav", -3, tmp_path / "rvc.wav")
