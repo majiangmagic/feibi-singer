@@ -351,12 +351,12 @@
 - 日期：2026-08-03
 - 优先级：1
 - 所属区域：`交互式分段生成`
-- 用户可见行为：The local UI supports multiple song projects and from-scratch generation with direct multiline original-lyrics text. Each segment keeps aligned source and rewritten lyrics, then uses ACE-Step 1.5 cover plus flow-edit at cover strength 1.0 to preserve the source melody as closely as possible while replacing lyrics. Users can still edit each ACE seed, caption, target lyrics, and RVC pitch, preview candidates, approve them, and merge the song.。
+- 用户可见行为：The local UI supports multiple song projects and direct multiline original lyrics. Automatic Feibi rewriting now uses all six approved grammars when their minimum lengths fit the source line, preserves the source syllable count, and deterministically distributes repeated Fei, Bi, and Jiu tokens. Users can then edit each segment seed, caption, target lyrics, and RVC pitch before approving and merging.。
 - 状态：`passing`
 - 验证步骤：
-  1. Run unit tests for workbench persistence, validation, ACE/RVC commands, and previews.；
-  2. Verify that each segment aligns source and rewritten lyrics by the same line indices and sends flow-edit parameters to ACE-Step.；
-  3. Build the Gradio UI and confirm that from-scratch generation passes direct multiline lyrics text.；
-  4. Run the Harness check and verify the local service at 127.0.0.1:7860.。
-- 验证证据：34 pytest tests pass. ACE command tests cover strength 1.0, flow-edit source lyrics, and the source caption. Gradio UI construction passes in the ACE environment; the restarted local server responds with HTTP 200; Harness validation passes.。
-- 备注：The installed ACE-Step 1.5 runtime has no independent only_lyrics task, so this uses its supported cover plus flow-edit overlay. Older runs without original_lyrics.txt remain compatible and fall back to ordinary cover.。
+  1. Verify strict acceptance and rejection for the six approved grammars.；
+  2. Verify that four-syllable lines cycle through all six families.；
+  3. Verify that long lines cycle through all five length-flexible families with exact syllable preservation.；
+  4. Run the complete test suite, Python compilation, and Harness validation.。
+- 验证证据：38 pytest tests pass, including all-six-family coverage for four-syllable lines, five-family coverage for long lines, the reported eight-line long-song regression, repetition distribution, strict grammar validation, and exact syllable preservation. Python compilation, git diff checks, and Harness validation pass.。
+- 备注：Generation is deterministic by line index rather than random. Fei-Ba-Fen-Qian is fixed at four syllables; the other five families expand according to their plus-marked groups.。

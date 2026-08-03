@@ -2,24 +2,24 @@
   "current_status": {
     "latest_commit": {
       "hash": "working-tree",
-      "message": "add ACE-Step flow-edit lyric replacement"
+      "message": "complete six-family Feibi lyric generation"
     },
-    "test_status": "34 pytest tests passing; UI config, HTTP smoke test, and Harness checks passing",
-    "lint": "Python compile checks passed in project and ACE venvs"
+    "test_status": "38 pytest tests passing; compile and Harness checks passing",
+    "lint": "Python compile and git diff checks passed"
   },
   "completed": [
-    "The from-scratch UI accepts original lyrics as multiline text and passes them through --lyrics-text.",
-    "Timeline segments preserve aligned original and rewritten lyric lines for ACE-Step 1.5 cover flow-edit.",
-    "New and existing workbench runs use cover strength 1.0 plus flow-edit when original segment lyrics are available."
+    "The Feibi validator recognizes exactly the six user-defined lyric grammars.",
+    "The automatic lyric generator now cycles through every grammar feasible for each source-line syllable count.",
+    "Repetition groups marked with plus distribute extra syllables across Fei, Bi, and Jiu instead of padding only Jiu."
   ],
   "in_progress": [
-    "The feature is complete; the next real ACE generation will provide listening-based validation of melody preservation."
+    "The six-family generator fix is complete and ready to commit."
   ],
   "known_issues": [
-    "ACE-Step does not expose an independent only_lyrics task; lyric replacement uses the supported cover plus flow-edit overlay.",
-    "Older cached runs without original_lyrics.txt remain compatible but cannot enable flow-edit automatically."
+    "The four-syllable fixed phrase Fei-Ba-Fen-Qian is only feasible for four-syllable source lines.",
+    "One-syllable source lines cannot satisfy any approved grammar and remain validation failures."
   ],
   "next_steps": [
-    "Use the UI to create a new song run with direct original-lyrics text and audition flow-edit candidates."
+    "Use the regenerated preset lyrics in a new song run or edit existing segment presets manually."
   ]
 }

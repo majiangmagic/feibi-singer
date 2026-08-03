@@ -17,7 +17,7 @@ PATTERN_LABELS: tuple[tuple[str, str], ...] = (
     ("\u83f2+\u6bd4+\u557e+", rf"^{FEI}+{BI}+{JIU}+$"),
     ("\u83f2+\u6bd4+\u557e+\u6bd4", rf"^{FEI}+{BI}+{JIU}+{BI}$"),
     ("\u83f2+\u516b", rf"^{FEI}+{BA}$"),
-    ("\u83f2\u516b\u557e+\u6bd4", rf"^{FEI}{BA}{JIU}+{BI}$"),
+    ("\u83f2+\u516b\u557e+\u6bd4", rf"^{FEI}+{BA}{JIU}+{BI}$"),
     ("\u83f2\u516b\u5206\u94b1", rf"^{FEI}{BA}{FEN}{QIAN}$"),
 )
 
@@ -109,23 +109,46 @@ def validate_line(source: str, rewritten: str) -> LineCheck:
     )
 
 
+def _spread_repetitions(total: int, groups: int, offset: int) -> tuple[int, ...]:
+    """Distribute repetitions deterministically while keeping every group non-empty."""
+
+    counts = [1] * groups
+    for extra in range(total - groups):
+        counts[(offset + extra) % groups] += 1
+    return tuple(counts)
+
+
+def _feasible_pattern_indices(syllables: int) -> tuple[int, ...]:
+    minimums = (2, 3, 4, 2, 4, 4)
+    return tuple(
+        pattern_index
+        for pattern_index, minimum in enumerate(minimums)
+        if syllables >= minimum and (pattern_index != 5 or syllables == 4)
+    )
+
+
 def make_feibi_line(source: str, index: int = 0) -> str:
     syllables = syllable_count(source)
     if syllables < 2:
         return ""
-    # Alternate only between the user-approved families. Every '+' means one
-    # or more repetitions; a suffix without '+' is exactly one character.
-    if syllables == 2:
-        return FEI + (BI if index % 2 == 0 else BA)
-    if syllables == 3:
-        return FEI + BI + (JIU if index % 2 == 0 else BI)
-    if syllables == 4:
-        return (FEI + BI + JIU + BI) if index % 2 == 0 else FEI + BA + FEN + QIAN
-    if index % 2 == 0:
-        # ?+?+?+?: final ? is exactly one.
-        return FEI + BI + (JIU * (syllables - 3)) + BI
-    # ???+?: ????? are fixed, ? repeats as needed.
-    return FEI + BA + (JIU * (syllables - 3)) + BI
+
+    feasible = _feasible_pattern_indices(syllables)
+    pattern_index = feasible[index % len(feasible)]
+    if pattern_index == 0:
+        fei_count, bi_count = _spread_repetitions(syllables, 2, index)
+        return FEI * fei_count + BI * bi_count
+    if pattern_index == 1:
+        fei_count, bi_count, jiu_count = _spread_repetitions(syllables, 3, index)
+        return FEI * fei_count + BI * bi_count + JIU * jiu_count
+    if pattern_index == 2:
+        fei_count, bi_count, jiu_count = _spread_repetitions(syllables - 1, 3, index)
+        return FEI * fei_count + BI * bi_count + JIU * jiu_count + BI
+    if pattern_index == 3:
+        return FEI * (syllables - 1) + BA
+    if pattern_index == 4:
+        fei_count, jiu_count = _spread_repetitions(syllables - 2, 2, index)
+        return FEI * fei_count + BA + JIU * jiu_count + BI
+    return FEI + BA + FEN + QIAN
 
 
 def rewrite_lyrics(lines: list[str]) -> tuple[list[str], list[LineCheck]]:

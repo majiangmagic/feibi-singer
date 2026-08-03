@@ -3,21 +3,21 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `working-tree`（add ACE-Step flow-edit lyric replacement）
-- 测试状态：34 pytest tests passing; UI config, HTTP smoke test, and Harness checks passing
-- Lint：Python compile checks passed in project and ACE venvs
+- 最新 commit: `working-tree`（complete six-family Feibi lyric generation）
+- 测试状态：38 pytest tests passing; compile and Harness checks passing
+- Lint：Python compile and git diff checks passed
 
 ### 已完成
-- [x] The from-scratch UI accepts original lyrics as multiline text and passes them through --lyrics-text.
-- [x] Timeline segments preserve aligned original and rewritten lyric lines for ACE-Step 1.5 cover flow-edit.
-- [x] New and existing workbench runs use cover strength 1.0 plus flow-edit when original segment lyrics are available.
+- [x] The Feibi validator recognizes exactly the six user-defined lyric grammars.
+- [x] The automatic lyric generator now cycles through every grammar feasible for each source-line syllable count.
+- [x] Repetition groups marked with plus distribute extra syllables across Fei, Bi, and Jiu instead of padding only Jiu.
 
 ### 进行中
-- [ ] The feature is complete; the next real ACE generation will provide listening-based validation of melody preservation.
+- [ ] The six-family generator fix is complete and ready to commit.
 
 ### 已知问题
-- ACE-Step does not expose an independent only_lyrics task; lyric replacement uses the supported cover plus flow-edit overlay.；
-- Older cached runs without original_lyrics.txt remain compatible but cannot enable flow-edit automatically.。
+- The four-syllable fixed phrase Fei-Ba-Fen-Qian is only feasible for four-syllable source lines.；
+- One-syllable source lines cannot satisfy any approved grammar and remain validation failures.。
 
 ### 下一步
-1. Use the UI to create a new song run with direct original-lyrics text and audition flow-edit candidates.。
+1. Use the regenerated preset lyrics in a new song run or edit existing segment presets manually.。
