@@ -1,287 +1,295 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
+import json
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from feibi_singer.segment_workbench import SegmentWorkbench, WorkbenchError
 
 
-def build_app(workbench: SegmentWorkbench):
+def _song_id(run_dir: Path) -> str:
+    return str(run_dir.resolve())
+
+
+def _label(run_dir: Path) -> str:
+    return run_dir.name
+
+
+def _discover(workspace_dir: Path) -> dict[str, SegmentWorkbench]:
+    sessions: dict[str, SegmentWorkbench] = {}
+    if not workspace_dir.exists():
+        return sessions
+    for report in sorted(workspace_dir.glob("*/report.json")):
+        try:
+            wb = SegmentWorkbench(report.parent, report.parent / "workbench")
+            sessions[_song_id(report.parent)] = wb
+        except (FileNotFoundError, WorkbenchError, json.JSONDecodeError):
+            continue
+    return sessions
+
+
+def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
     import gradio as gr
 
-    def safe(callable_):
+    workspace_dir = (workspace_dir or workbench.run_dir.parent).resolve()
+    sessions = _discover(workspace_dir)
+    sessions.setdefault(_song_id(workbench.run_dir), workbench)
+    current = {"value": workbench}
+
+    def wb() -> SegmentWorkbench:
+        return current["value"]
+
+    def safe(fn):
         try:
-            return callable_()
+            return fn()
         except Exception as exc:
             raise gr.Error(str(exc)) from exc
 
-    def load_segment(index: int):
+    def song_choices():
+        return [(f"{_label(item.run_dir)} ({item.run_dir})", key) for key, item in sessions.items()]
+
+    def segment_choices():
+        return wb().segment_indices
+
+    def segment_values(index: int | float | None):
+        index = int(index or wb().segment_indices[0])
+        segment = wb().segment(index)
+        choices = wb().candidate_choices(index)
+        candidate_id = choices[0][1] if choices else None
+        ace_audio = ace_original = ace_generated = None
+        rvc_choices: list[tuple[str, str]] = []
+        rvc_id = rvc_audio = rvc_original = rvc_vocal_only = None
+        if candidate_id:
+            candidate = wb().candidate(index, candidate_id)
+            ace_audio = candidate["ace_audio"]
+            previews = wb().ace_preview(index, candidate_id)
+            ace_original, ace_generated = previews["with_original"], previews["generated_melody"]
+            rvc_choices = wb().rvc_choices(index, candidate_id)
+            if rvc_choices:
+                rvc_id = rvc_choices[0][1]
+                result = wb().rvc_result(index, candidate_id, rvc_id)
+                rvc_audio = result["audio"]
+                previews = wb().rvc_preview(index, candidate_id, rvc_id)
+                rvc_original, rvc_vocal_only = previews["with_original"], previews["vocal_only"]
+        approved = segment.get("approved")
+        status = (f"已选定：seed {approved['seed']} / RVC {approved['f0_change']:+d}"
+                  if approved else "尚未选定本段最佳结果")
+        timing = (f"核心区间 {segment['core_start']:.3f}s–{segment['core_end']:.3f}s；"
+                  f"生成输入 {segment['input_start']:.3f}s–{segment['input_end']:.3f}s")
+        return (
+            int(segment["default_seed"]), segment["default_caption"], segment["default_lyrics"],
+            int(segment["default_f0_change"]), segment["source_audio"],
+            gr.update(choices=choices, value=candidate_id), ace_audio, ace_original, ace_generated,
+            gr.update(choices=rvc_choices, value=rvc_id), rvc_audio, rvc_original, rvc_vocal_only,
+            status, timing, wb().approval_summary(),
+        )
+
+    def load_segment(index):
+        return safe(lambda: segment_values(index))
+
+    def select_song(song_id: str):
         def action():
-            segment = workbench.segment(int(index))
-            choices = workbench.candidate_choices(int(index))
-            candidate_id = choices[0][1] if choices else None
-            ace_audio = None
-            ace_original_audio = None
-            ace_generated_audio = None
-            rvc_choices = []
-            rvc_id = None
-            rvc_audio = None
-            if candidate_id:
-                candidate = workbench.candidate(int(index), candidate_id)
-                ace_audio = candidate["ace_audio"]
-                ace_previews = workbench.ace_preview(int(index), candidate_id)
-                ace_original_audio = ace_previews["with_original"]
-                ace_generated_audio = ace_previews["generated_melody"]
-                rvc_choices = workbench.rvc_choices(int(index), candidate_id)
-                if rvc_choices:
-                    rvc_id = rvc_choices[0][1]
-                    rvc_result_data = workbench.rvc_result(int(index), candidate_id, rvc_id)
-                    rvc_audio = rvc_result_data["audio"]
-                    rvc_previews = workbench.rvc_preview(int(index), candidate_id, rvc_id)
-                    rvc_original_audio = rvc_previews["with_original"]
-                    rvc_vocal_only_audio = rvc_previews["vocal_only"]
-            approved = segment.get("approved")
-            status = (
-                f"已选最佳：seed {approved['seed']} / RVC {approved['f0_change']:+d}"
-                if approved else "尚未选定本段最佳结果"
-            )
-            timing = (
-                f"核心区间 {segment['core_start']:.3f}s–{segment['core_end']:.3f}s；"
-                f"生成输入 {segment['input_start']:.3f}s–{segment['input_end']:.3f}s"
-            )
-            return (
-                int(segment["default_seed"]),
-                segment["default_caption"],
-                segment["default_lyrics"],
-                int(segment["default_f0_change"]),
-                segment["source_audio"],
-                gr.update(choices=choices, value=candidate_id),
-                ace_audio,
-                ace_original_audio,
-                ace_generated_audio,
-                gr.update(choices=rvc_choices, value=rvc_id),
-                rvc_audio,
-                rvc_original_audio,
-                rvc_vocal_only_audio,
-                status,
-                timing,
-                workbench.approval_summary(),
-            )
+            if song_id not in sessions:
+                raise WorkbenchError("找不到歌曲运行项目")
+            current["value"] = sessions[song_id]
+            first = wb().segment_indices[0]
+            return (gr.update(choices=segment_choices(), value=first), *segment_values(first),
+                    f"已切换到：{wb().run_dir}")
         return safe(action)
 
-    def generate_ace(index: int, seed: int, caption: str, lyrics: str):
+    def refresh_songs():
+        sessions.update(_discover(workspace_dir))
+        choices = song_choices()
+        value = _song_id(wb().run_dir)
+        return gr.update(choices=choices, value=value)
+
+    def generate_song(input_audio, lyrics_file, run_name, caption_override, seed_plan):
         def action():
-            candidate = workbench.generate_ace(int(index), int(seed), caption, lyrics)
-            choices = workbench.candidate_choices(int(index))
-            previews = workbench.ace_preview(int(index), candidate["id"])
-            return (
-                gr.update(choices=choices, value=candidate["id"]),
-                candidate["ace_audio"],
-                previews["with_original"],
-                previews["generated_melody"],
-                gr.update(choices=[], value=None),
-                None,
-                None,
-                None,
-                f"ACE 已生成：{candidate['id']}。请试听；满意后再生成 RVC。",
-            )
+            if not input_audio:
+                raise WorkbenchError("请先选择输入音频")
+            name = "".join(ch for ch in (run_name or "new_song").strip() if ch.isalnum() or ch in "-_ ").strip()
+            if not name:
+                name = "new_song"
+            output_dir = workspace_dir / name
+            if output_dir.exists() and (output_dir / "report.json").exists():
+                raise WorkbenchError(f"运行目录已存在：{output_dir}")
+            cmd = [sys.executable, str(Path(__file__).with_name("feibi_pipeline.py")),
+                   "--input", str(Path(input_audio).resolve()), "--output-dir", str(output_dir)]
+            if lyrics_file:
+                cmd += ["--lyrics", str(Path(lyrics_file).resolve()), "--no-asr-fallback"]
+            if caption_override and caption_override.strip():
+                cmd += ["--caption", caption_override.strip()]
+            if seed_plan and seed_plan.strip():
+                cmd += ["--seed-plan", seed_plan.strip()]
+            completed = subprocess.run(cmd, cwd=str(Path(__file__).parents[1]), text=True,
+                                       capture_output=True, encoding="utf-8", errors="replace")
+            if completed.returncode:
+                raise WorkbenchError((completed.stderr or completed.stdout)[-4000:])
+            new_wb = SegmentWorkbench(output_dir, output_dir / "workbench")
+            key = _song_id(output_dir)
+            sessions[key] = new_wb
+            current["value"] = new_wb
+            first = new_wb.segment_indices[0]
+            return (gr.update(choices=song_choices(), value=key),
+                    gr.update(choices=new_wb.segment_indices, value=first), *segment_values(first),
+                    f"从头生成完成：{output_dir}")
         return safe(action)
 
-    def load_candidate(index: int, candidate_id: str | None):
+    def generate_ace(index, seed, caption, lyrics):
+        def action():
+            candidate = wb().generate_ace(int(index), int(seed), caption or "", lyrics or "")
+            previews = wb().ace_preview(int(index), candidate["id"])
+            return (gr.update(choices=wb().candidate_choices(int(index)), value=candidate["id"]),
+                    candidate["ace_audio"], previews["with_original"], previews["generated_melody"],
+                    gr.update(choices=[], value=None), None, None, None,
+                    f"ACE 已生成：{candidate['id']}。请试听 ACE+原旋律 与 ACE 生成旋律。")
+        return safe(action)
+
+    def load_candidate(index, candidate_id):
         if not candidate_id:
-            return None, gr.update(choices=[], value=None), None, "请先选择 ACE 候选"
+            return None, None, None, gr.update(choices=[], value=None), None, None, None, "请先选择 ACE 候选"
         def action():
-            candidate = workbench.candidate(int(index), candidate_id)
-            choices = workbench.rvc_choices(int(index), candidate_id)
+            candidate = wb().candidate(int(index), candidate_id)
+            previews = wb().ace_preview(int(index), candidate_id)
+            choices = wb().rvc_choices(int(index), candidate_id)
             rvc_id = choices[0][1] if choices else None
-            rvc_audio = workbench.rvc_result(int(index), candidate_id, rvc_id)["audio"] if rvc_id else None
-            previews = workbench.ace_preview(int(index), candidate_id)
-            rvc_original_audio = None
-            rvc_vocal_only_audio = None
             if rvc_id:
-                rvc_previews = workbench.rvc_preview(int(index), candidate_id, rvc_id)
-                rvc_original_audio = rvc_previews["with_original"]
-                rvc_vocal_only_audio = rvc_previews["vocal_only"]
-            return (
-                candidate["ace_audio"],
-                previews["with_original"],
-                previews["generated_melody"],
-                gr.update(choices=choices, value=rvc_id),
-                rvc_audio,
-                rvc_original_audio,
-                rvc_vocal_only_audio,
-                f"已载入 ACE 候选（seed {candidate['seed']}），可以试听或选择 RVC 结果。",
-            )
+                result = wb().rvc_result(int(index), candidate_id, rvc_id)
+                rp = wb().rvc_preview(int(index), candidate_id, rvc_id)
+                return (candidate["ace_audio"], previews["with_original"], previews["generated_melody"],
+                        gr.update(choices=choices, value=rvc_id), result["audio"], rp["with_original"], rp["vocal_only"],
+                        f"已加载 ACE 候选（seed {candidate['seed']}）")
+            return (candidate["ace_audio"], previews["with_original"], previews["generated_melody"],
+                    gr.update(choices=[], value=None), None, None, None, "已加载 ACE 候选，尚无 RVC 结果")
         return safe(action)
 
-    def generate_rvc(index: int, candidate_id: str | None, f0_change: int):
+    def generate_rvc(index, candidate_id, f0_change):
         if not candidate_id:
-            raise gr.Error("?????? ACE ??")
+            raise gr.Error("请先选择 ACE 候选")
         def action():
-            result = workbench.generate_rvc(int(index), candidate_id, int(f0_change))
-            choices = workbench.rvc_choices(int(index), candidate_id)
-            previews = workbench.rvc_preview(int(index), candidate_id, result["id"])
-            return (
-                gr.update(choices=choices, value=result["id"]),
-                result["audio"],
-                previews["with_original"],
-                previews["vocal_only"],
-                f"RVC ???????? {result['f0_change']:+d}?????????????????",
-            )
+            result = wb().generate_rvc(int(index), candidate_id, int(f0_change))
+            previews = wb().rvc_preview(int(index), candidate_id, result["id"])
+            return (gr.update(choices=wb().rvc_choices(int(index), candidate_id), value=result["id"]),
+                    result["audio"], previews["with_original"], previews["vocal_only"],
+                    f"RVC 已生成：动态升调 {result['f0_change']:+d} 半音")
         return safe(action)
 
-    def load_rvc(index: int, candidate_id: str | None, rvc_id: str | None):
+    def load_rvc(index, candidate_id, rvc_id):
         if not candidate_id or not rvc_id:
-            return None, None, None, "???? RVC ??"
+            return None, None, None, "请选择 RVC 结果"
         def action():
-            result = workbench.rvc_result(int(index), candidate_id, rvc_id)
-            previews = workbench.rvc_preview(int(index), candidate_id, rvc_id)
-            return (
-                result["audio"],
-                previews["with_original"],
-                previews["vocal_only"],
-                f"??? RVC ??????? {result['f0_change']:+d}??",
-            )
+            result = wb().rvc_result(int(index), candidate_id, rvc_id)
+            previews = wb().rvc_preview(int(index), candidate_id, rvc_id)
+            return result["audio"], previews["with_original"], previews["vocal_only"], f"已加载 RVC：{result['f0_change']:+d} 半音"
         return safe(action)
 
-    def approve(index: int, candidate_id: str | None, rvc_id: str | None):
+    def approve(index, candidate_id, rvc_id):
         if not candidate_id or not rvc_id:
             raise gr.Error("请先选择 ACE 和 RVC 结果")
+        return safe(lambda: (f"已选定第 {int(index)} 段：" + str(wb().approve(int(index), candidate_id, rvc_id)["seed"]), wb().approval_summary()))
+
+    def merge(output_name):
         def action():
-            approved = workbench.approve(int(index), candidate_id, rvc_id)
-            return (
-                f"已选定第 {int(index)} 段：seed {approved['seed']} / RVC {approved['f0_change']:+d}",
-                workbench.approval_summary(),
-            )
+            clean = "".join(ch for ch in (output_name or "").strip() if ch.isalnum() or ch in "-_ ").strip() or "final_feibi_song"
+            result = wb().merge_approved(clean)
+            return result["wav"], result["mp3"], result["report"], f"合并完成；人声响度增益 {result['vocal_gain_db']:+.2f} dB"
         return safe(action)
 
-    def merge(output_name: str):
-        def action():
-            clean_name = "".join(ch for ch in output_name.strip() if ch.isalnum() or ch in "-_ ").strip()
-            if not clean_name:
-                clean_name = "final_feibi_song"
-            result = workbench.merge_approved(clean_name)
-            return result["wav"], result["mp3"], result["report"], f"合并完成；最终人声响度增益 {result['vocal_gain_db']:+.2f} dB。"
-        return safe(action)
-
-    first = workbench.segment_indices[0]
-    with gr.Blocks(title="菲比演唱分段工作台") as app:
-        gr.Markdown(
-            "# 菲比演唱分段工作台\n"
-            "逐段调整 ACE-Step seed、提示词和预设歌词，试听 ACE 结果；再调整 RVC 动态升调并试听。"
-            "每段选定最佳结果后，统一与原伴奏合并成完整歌曲。"
-        )
+    first = wb().segment_indices[0]
+    with gr.Blocks(title="菲比歌手分段工作台") as app:
+        gr.Markdown("# 菲比歌手分段工作台\n逐段替换 ACE seed / caption / 预设歌词，试听 **ACE+原旋律** 和 **ACE生成旋律**；再调整 RVC 动态升调，选定后合并。")
         with gr.Row():
-            segment_index = gr.Dropdown(
-                choices=workbench.segment_indices,
-                value=first,
-                label="选择约 15 秒分段",
-                interactive=True,
-            )
+            song = gr.Dropdown(choices=song_choices(), value=_song_id(wb().run_dir), label="歌曲 / 运行项目", interactive=True)
+            refresh = gr.Button("刷新歌曲列表")
+            song_status = gr.Textbox(label="项目状态", interactive=False)
+        gr.Markdown("## 从头开始生成（新歌曲会加入上面的项目列表）")
+        with gr.Row():
+            input_audio = gr.Audio(label="输入歌曲音频", type="filepath")
+            lyrics_file = gr.File(label="原始歌词文件（可选）", type="filepath")
+        with gr.Row():
+            run_name = gr.Textbox(label="输出运行名称", value="new_song")
+            caption_override = gr.Textbox(label="Caption 覆盖（留空使用原默认值）")
+            seed_plan = gr.Textbox(label="Seed 计划（可选，如 44,46,45）")
+        generate_song_button = gr.Button("从头开始生成歌曲", variant="primary")
+        with gr.Row():
+            segment_index = gr.Dropdown(choices=segment_choices(), value=first, label="选择 15 秒分段", interactive=True)
             timing = gr.Textbox(label="分段时间", interactive=False)
         with gr.Row():
             source_audio = gr.Audio(label="原始分段试听", type="filepath")
             status = gr.Textbox(label="当前状态", interactive=False)
-
-        gr.Markdown("## 1. ACE-Step（CAS）生成与试听")
+        gr.Markdown("## 1. ACE-Step（CAS）")
         with gr.Row():
             seed = gr.Number(label="ACE seed", precision=0)
-            caption = gr.Textbox(label="ACE 提示词 / Caption", lines=4)
-        lyrics = gr.Textbox(label="ACE 预设歌词", lines=10)
+            caption = gr.Textbox(label="ACE Caption", lines=3)
+        lyrics = gr.Textbox(label="ACE 预设歌词", lines=5)
         generate_ace_button = gr.Button("按当前设置重新生成 ACE", variant="primary")
+        candidate = gr.Dropdown(label="ACE 候选历史", choices=[], interactive=True)
         with gr.Row():
-            candidate = gr.Dropdown(label="ACE 候选历史", choices=[], interactive=True)
-        with gr.Row():
-            ace_audio = gr.Audio(label="ACE ???????? ACE ?????", type="filepath")
-            ace_original_audio = gr.Audio(label="ACE + ???????", type="filepath")
-            ace_generated_audio = gr.Audio(label="ACE ??????", type="filepath")
-
-        gr.Markdown("## 2. RVC 动态升调与试听")
+            ace_audio = gr.Audio(label="ACE 原始结果", type="filepath")
+            ace_original_audio = gr.Audio(label="ACE + 原旋律", type="filepath")
+            ace_generated_audio = gr.Audio(label="ACE 生成旋律", type="filepath")
+        gr.Markdown("## 2. RVC 动态升调")
         with gr.Row():
             f0_change = gr.Slider(-12, 12, value=2, step=1, label="RVC 动态升调（半音）")
             generate_rvc_button = gr.Button("用当前 ACE 生成 RVC", variant="primary")
+        rvc_result = gr.Dropdown(label="RVC 结果历史", choices=[], interactive=True)
         with gr.Row():
-            rvc_result = gr.Dropdown(label="RVC 结果历史", choices=[], interactive=True)
-        with gr.Row():
-            rvc_audio = gr.Audio(label="RVC ????", type="filepath")
-            rvc_original_audio = gr.Audio(label="RVC + ???????", type="filepath")
-            rvc_vocal_only_audio = gr.Audio(label="RVC ?????", type="filepath")
+            rvc_audio = gr.Audio(label="RVC 原始结果", type="filepath")
+            rvc_original_audio = gr.Audio(label="RVC + 原旋律", type="filepath")
+            rvc_vocal_only_audio = gr.Audio(label="RVC 纯人声（辅助）", type="filepath")
         approve_button = gr.Button("选为本段最佳结果", variant="primary")
-
-        gr.Markdown("## 3. 确认全部分段并合并")
         approval_summary = gr.Textbox(label="分段选定情况", lines=7, interactive=False)
         with gr.Row():
             output_name = gr.Textbox(value="final_feibi_song", label="最终文件名")
             merge_button = gr.Button("合并所有最佳分段", variant="primary")
         with gr.Row():
-            final_wav = gr.Audio(label="最终 WAV 试听", type="filepath")
-            final_mp3 = gr.Audio(label="最终 MP3 试听", type="filepath")
-        final_report = gr.File(label="下载合并报告")
+            final_wav = gr.Audio(label="最终 WAV", type="filepath")
+            final_mp3 = gr.Audio(label="最终 MP3", type="filepath")
+        final_report = gr.File(label="合并报告")
         merge_status = gr.Textbox(label="合并状态", interactive=False)
 
-        load_outputs = [
-            seed, caption, lyrics, f0_change, source_audio, candidate, ace_audio,
-            ace_original_audio, ace_generated_audio, rvc_result, rvc_audio,
-            rvc_original_audio, rvc_vocal_only_audio, status, timing, approval_summary,
-        ]
+        load_outputs = [seed, caption, lyrics, f0_change, source_audio, candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status, timing, approval_summary]
         app.load(load_segment, inputs=[segment_index], outputs=load_outputs)
         segment_index.change(load_segment, inputs=[segment_index], outputs=load_outputs)
-        generate_ace_button.click(
-            generate_ace,
-            inputs=[segment_index, seed, caption, lyrics],
-            outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status],
-        )
-        candidate.change(
-            load_candidate,
-            inputs=[segment_index, candidate],
-            outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status],
-        )
-        generate_rvc_button.click(
-            generate_rvc,
-            inputs=[segment_index, candidate, f0_change],
-            outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status],
-        )
-        rvc_result.change(
-            load_rvc,
-            inputs=[segment_index, candidate, rvc_result],
-            outputs=[rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status],
-        )
-        approve_button.click(
-            approve,
-            inputs=[segment_index, candidate, rvc_result],
-            outputs=[status, approval_summary],
-        )
-        merge_button.click(
-            merge,
-            inputs=[output_name],
-            outputs=[final_wav, final_mp3, final_report, merge_status],
-        )
+        song.change(select_song, inputs=[song], outputs=[segment_index, *load_outputs, song_status])
+        refresh.click(refresh_songs, outputs=[song])
+        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_file, run_name, caption_override, seed_plan], outputs=[song, segment_index, *load_outputs, song_status])
+        generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics], outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
+        candidate.change(load_candidate, inputs=[segment_index, candidate], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
+        generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
+        rvc_result.change(load_rvc, inputs=[segment_index, candidate, rvc_result], outputs=[rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
+        approve_button.click(approve, inputs=[segment_index, candidate, rvc_result], outputs=[status, approval_summary])
+        merge_button.click(merge, inputs=[output_name], outputs=[final_wav, final_mp3, final_report, merge_status])
     return app
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Interactive ACE/RVC segment workbench")
-    parser.add_argument("--run-dir", required=True, type=Path, help="completed segmented run directory")
-    parser.add_argument("--workbench-dir", type=Path, help="session/cache directory; default RUN_DIR/workbench")
+    parser.add_argument("--run-dir", type=Path, help="initial completed run directory")
+    parser.add_argument("--workbench-dir", type=Path)
+    parser.add_argument("--workspace-dir", type=Path, help="directory containing multiple run directories")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
-
-    workbench = SegmentWorkbench(args.run_dir, args.workbench_dir)
-    app = build_app(workbench)
-    app.queue(default_concurrency_limit=1).launch(
-        server_name=args.host,
-        server_port=args.port,
-        inbrowser=not args.no_browser,
-        allowed_paths=[str(workbench.run_dir), str(workbench.workbench_dir)],
-        show_error=True,
-        theme=__import__("gradio").themes.Soft(),
-    )
+    workspace = (args.workspace_dir or (args.run_dir.parent if args.run_dir else Path("runs"))).resolve()
+    initial = args.run_dir.resolve() if args.run_dir else None
+    if initial is None:
+        found = _discover(workspace)
+        if not found:
+            parser.error("请提供 --run-dir，或在 --workspace-dir 下放置至少一个包含 report.json 的运行项目")
+        initial = next(iter(found.values())).run_dir
+    workbench = SegmentWorkbench(initial, args.workbench_dir)
+    app = build_app(workbench, workspace)
+    app.queue(default_concurrency_limit=1).launch(server_name=args.host, server_port=args.port,
+        inbrowser=not args.no_browser, allowed_paths=[str(workspace), str(initial)], show_error=True,
+        theme=__import__("gradio").themes.Soft())
     return 0
 
 

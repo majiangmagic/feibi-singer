@@ -13,13 +13,12 @@ QIAN = chr(0x94B1)
 TOKENS = (FEI, BI, JIU, BA, FEN, QIAN)
 
 PATTERN_LABELS: tuple[tuple[str, str], ...] = (
-    ("????", rf"^{FEI}+{BI}+{JIU}+{BI}+$"),
-    ("???", rf"^{FEI}+{BI}+{JIU}+$"),
-    ("??", rf"^{FEI}+{BI}+$"),
-    ("????", rf"^{FEI}+{BA}+{JIU}+{BI}+$"),
-    ("??", rf"^{FEI}+{BA}+$"),
-    ("????", rf"^{FEI}{BA}{FEN}{QIAN}$"),
-    ("?", rf"^{FEI}$"),
+    ("\u83f2+\u6bd4+", rf"^{FEI}+{BI}+$"),
+    ("\u83f2+\u6bd4+\u557e+", rf"^{FEI}+{BI}+{JIU}+$"),
+    ("\u83f2+\u6bd4+\u557e+\u6bd4", rf"^{FEI}+{BI}+{JIU}+{BI}$"),
+    ("\u83f2+\u516b", rf"^{FEI}+{BA}$"),
+    ("\u83f2\u516b\u557e+\u6bd4", rf"^{FEI}{BA}{JIU}+{BI}$"),
+    ("\u83f2\u516b\u5206\u94b1", rf"^{FEI}{BA}{FEN}{QIAN}$"),
 )
 
 
@@ -67,12 +66,23 @@ def syllable_count(text: str) -> int:
     return count
 
 
-def _compact(text: str) -> str:
-    return "".join(ch for ch in text if ch in TOKENS)
+def _compact(text: str) -> str | None:
+    """Return a whitespace-normalized line, or ``None`` for foreign symbols.
+
+    The six user-defined forms are exact token grammars.  In particular, do
+    not silently drop arbitrary characters: doing so could turn an invalid
+    line such as ``?x?`` into a valid ``??`` line.
+    """
+    compact = "".join(ch for ch in text if not ch.isspace())
+    if any(ch not in TOKENS for ch in compact):
+        return None
+    return compact
 
 
 def detect_pattern(text: str) -> str | None:
     compact = _compact(text)
+    if compact is None:
+        return None
     for label, pattern in PATTERN_LABELS:
         if re.fullmatch(pattern, compact):
             return label
@@ -101,16 +111,20 @@ def validate_line(source: str, rewritten: str) -> LineCheck:
 
 def make_feibi_line(source: str, index: int = 0) -> str:
     syllables = syllable_count(source)
-    if syllables <= 0:
+    if syllables < 2:
         return ""
-    if syllables == 1:
-        return FEI
+    # Alternate only between the user-approved families. Every '+' means one
+    # or more repetitions; a suffix without '+' is exactly one character.
     if syllables == 2:
         return FEI + (BI if index % 2 == 0 else BA)
     if syllables == 3:
-        return (FEI + BI + JIU) if index % 2 == 0 else (FEI + BA + BA)
+        return FEI + BI + (JIU if index % 2 == 0 else BI)
+    if syllables == 4:
+        return (FEI + BI + JIU + BI) if index % 2 == 0 else FEI + BA + FEN + QIAN
     if index % 2 == 0:
+        # ?+?+?+?: final ? is exactly one.
         return FEI + BI + (JIU * (syllables - 3)) + BI
+    # ???+?: ????? are fixed, ? repeats as needed.
     return FEI + BA + (JIU * (syllables - 3)) + BI
 
 

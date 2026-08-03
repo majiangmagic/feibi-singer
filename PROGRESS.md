@@ -3,26 +3,21 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `5153b66`（record fixed seed unhappy validation）
-- 测试状态：30 pytest tests passing; real-run integration merge and complete browser UI end-to-end merge passed
-- Lint：Python compile checks passed in project and ACE venvs; UI --help, Harness check, and git diff check passed
+- 最新 commit: `working-tree`（repair multi-song segment workbench）
+- 测试状态：34 pytest tests passing; UI config and Harness checks passing
+- Lint：Python compile checks passed in project and ACE venvs
 
 ### 已完成
-- [x] Demucs separation, lyric rewrite, ACE-Step cover generation, and RVC conversion work end to end.
-- [x] Timeline-aligned approximately 15-second segmented generation preserves the original instrumental.
-- [x] Optional ACE caption override and fixed per-segment seed plans preserve existing defaults when omitted.
-- [x] F23 local workbench edits and auditions per-segment ACE/RVC candidates, persists approvals, and merges only after every segment is approved.
-- [x] F23 passed 30 unit tests, real unhappy v10 integration merge, and complete browser UI merge verification with WAV/MP3/report outputs.
+- [x] The segment workbench supports ACE and RVC candidates with original-melody previews.
+- [x] The UI supports multiple run projects and a from-scratch generation command.
+- [x] Feibi lyric validation strictly follows the six user-defined grammars.
 
 ### 进行中
-- [ ] F23 实现与三层验证全部完成，等待提交。
+- [ ] Restart the local UI and verify first-segment loading and project switching end to end.
 
 ### 已知问题
-- 没有 CloudMist/OpenAI API Key，本次歌词改写使用 local_rule_fallback，F12 仍未验收；
-- CTranslate2 CUDA 缺 cublas64_12.dll，本次 faster-whisper 使用 CPU int8；
-- ACE-Step 和 RVC 依赖分别要求 Python 3.11 与 Python 3.10，必须保持独立 venv；
-- ACE-Step 固定 seed 仍可能出现候选波动，当前最多尝试 seed 44、43、45-50；RVC 升调仍会改变高频能量和发音清晰度；
-- 当前 RMS 覆盖率会把 Demucs 人声轨中的乐器泄漏误判为唱声；必须新增真实人声存在性判定，不能再把覆盖率等同于连续演唱。
+- Real model generation remains dependent on the installed ACE-Step and RVC environments.；
+- The first segment uses boundary-safe preview handling when the source starts at zero.。
 
 ### 下一步
-1. Commit the completed F23 workbench feature.。
+1. Run browser verification against the local Gradio server.。
