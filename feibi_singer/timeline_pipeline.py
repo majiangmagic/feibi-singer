@@ -23,10 +23,17 @@ MIN_VOCAL_COVERAGE = 0.85
 PREFERRED_VOCAL_COVERAGE = 1.0
 RVC_F0_CHANGE = 2
 ACE_CAPTION = (
-    "Studio indie rock vocal. Clear standard Mandarin diction and lyric intelligibility "
-    "are the highest priority. Restrained, clean, even singing; preserve the original "
-    "melody and rhythm. No live-concert delivery, shouting, belting, rasp, growling, "
-    "ad-libs, or exaggerated emotion."
+    "Strict source-melody preservation. Replace only the lyrics. Use a clean, dry, "
+    "close-miked lead vocal with exceptionally clear Mandarin diction. Pronounce every "
+    "Chinese character as one distinct syllable. Make \u201c\u83f2\u201d sound clearly like \"f\u0113i\", "
+    "\u201c\u6bd4\u201d clearly like \"b\u01d0\", \u201c\u557e\u201d clearly like \"ji\u016b\", and \u201c\u516b\u201d clearly like \"b\u0101\". "
+    "Keep consonant attacks crisp and vowels fully articulated. Do not blur, swallow, "
+    "merge, stretch, or substitute lyric syllables.\n\n"
+    "Keep every source vocal note, pitch contour, rhythm, note timing, note duration, "
+    "phrasing, pause, breath, syllable placement, entrance, and line ending unchanged. "
+    "Keep the original tempo, key, harmony, arrangement, instrumentation, and structure. "
+    "No new melody, transposition, reharmonization, improvisation, ornamentation, "
+    "melisma, vocal runs, ad-libs, backing vocals, or extra syllables."
 )
 
 

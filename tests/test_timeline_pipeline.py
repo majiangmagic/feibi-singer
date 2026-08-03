@@ -18,9 +18,14 @@ def test_dynamic_segments_use_locally_approved_rvc_pitch_shift():
     assert RVC_F0_CHANGE == 2
 
 
-def test_ace_prioritizes_clear_studio_diction_over_live_delivery():
-    assert "diction and lyric intelligibility are the highest priority" in ACE_CAPTION
-    assert "No live-concert delivery" in ACE_CAPTION
+def test_ace_default_caption_requires_clear_lyrics_and_strict_melody_preservation():
+    assert "Strict source-melody preservation." in ACE_CAPTION
+    assert "exceptionally clear Mandarin diction" in ACE_CAPTION
+    assert "\u201c\u83f2\u201d" in ACE_CAPTION and "f\u0113i" in ACE_CAPTION
+    assert "\u201c\u6bd4\u201d" in ACE_CAPTION and "b\u01d0" in ACE_CAPTION
+    assert "\u201c\u557e\u201d" in ACE_CAPTION and "ji\u016b" in ACE_CAPTION
+    assert "\u201c\u516b\u201d" in ACE_CAPTION and "b\u0101" in ACE_CAPTION
+    assert "No new melody" in ACE_CAPTION
 
 
 def test_fixed_seed_plan_is_explicitly_supported_without_changing_default_search():
