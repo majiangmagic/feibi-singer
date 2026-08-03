@@ -8,7 +8,6 @@
 - Lint：Python compile and git diff checks passed
 
 ### 已完成
-- [x] The Feibi validator recognizes exactly the six user-defined lyric grammars.
 - [x] The automatic lyric generator now cycles through every grammar feasible for each source-line syllable count.
 - [x] Repetition groups marked with plus distribute extra syllables across Fei, Bi, and Jiu instead of padding only Jiu.
 - [x] The segment workbench now exposes a -6 to +12 dB preview vocal gain slider for ACE/RVC plus-original-melody audition.
@@ -16,7 +15,7 @@
 - [x] Fixed the segment UI so generating a new ACE candidate does not trigger a selection callback that overwrites its fresh audio with an older candidate.
 
 ### 进行中
-- [ ] The candidate preview selection fix is verified and ready to commit.
+- [ ] The candidate preview selection fix is committed; final Harness validation and UI restart remain.
 
 ### 已知问题
 - Preview vocal gain changes ACE/RVC audition files only; final merge retains integrated-LUFS matching.；
@@ -24,4 +23,4 @@
 - One-syllable source lines cannot satisfy any approved grammar and remain validation failures.。
 
 ### 下一步
-1. Commit the candidate preview selection fix and restart the local UI.。
+1. Run Harness validation and restart the local UI.。
