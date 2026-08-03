@@ -3,8 +3,8 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `9362386`（update default ACE caption）
-- 测试状态：39 pytest tests passing; Python compile and Harness checks passing
+- 最新 commit: `working-tree`（fix generated candidate preview selection）
+- 测试状态：39 pytest tests passing; feibi_unhappy_sesame4 UI smoke passed; Harness check passing
 - Lint：Python compile and git diff checks passed
 
 ### 已完成
@@ -13,9 +13,10 @@
 - [x] Repetition groups marked with plus distribute extra syllables across Fei, Bi, and Jiu instead of padding only Jiu.
 - [x] The segment workbench now exposes a -6 to +12 dB preview vocal gain slider for ACE/RVC plus-original-melody audition.
 - [x] The default ACE caption now uses strict source-melody preservation and explicit clear Mandarin pronunciation guidance for four Feibi syllables.
+- [x] Fixed the segment UI so generating a new ACE candidate does not trigger a selection callback that overwrites its fresh audio with an older candidate.
 
 ### 进行中
-- [ ] The default ACE caption update is committed; final repository verification is complete.
+- [ ] The candidate preview selection fix is verified and ready to commit.
 
 ### 已知问题
 - Preview vocal gain changes ACE/RVC audition files only; final merge retains integrated-LUFS matching.；
@@ -23,4 +24,4 @@
 - One-syllable source lines cannot satisfy any approved grammar and remain validation failures.。
 
 ### 下一步
-1. Use the new default caption for the next ACE-Step generation.。
+1. Commit the candidate preview selection fix and restart the local UI.。
