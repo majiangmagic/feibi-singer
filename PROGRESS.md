@@ -3,20 +3,19 @@
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `ce7fe14`（???? seed ?????? unhappy）
-- 测试状态：24 ? pytest ???caption ??????? --caption ????? --seed-plan ???? ACE seed
-- Lint：??? unhappy ?? v9 ???????? seed 44?46?45?48?49?5 ?????? 100%
+- 最新 commit: `5153b66`（record fixed seed unhappy validation）
+- 测试状态：30 pytest tests passing; real-run integration merge and complete browser UI end-to-end merge passed
+- Lint：Python compile checks passed in project and ACE venvs; UI --help, Harness check, and git diff check passed
 
 ### 已完成
-- [x] 已用 Demucs CUDA 对用户 MP3 和 ACE-Step 输出完成真实人声/伴奏分离
-- [x] 已支持用户歌词优先并用本地规则生成通过校验的菲比歌词
-- [x] 已用 ACE-Step 1.5 turbo 生成原唱活动窗口，并用 RVC 菲比模型转换生成歌声
-- [x] 已将 RVC 歌声按自动检测的原唱起点延迟并混回原始伴奏，前奏约 0-16.44 秒无人声
-- [x] 已用 7.5 秒上下文、0.25 秒拼接把手和逐秒 RMS 门槛完成 5 段生成；RVC 经局部试听后统一改为 +2
-- [x] ??? --seed-plan ???? ACE ??????????????????
+- [x] Demucs separation, lyric rewrite, ACE-Step cover generation, and RVC conversion work end to end.
+- [x] Timeline-aligned approximately 15-second segmented generation preserves the original instrumental.
+- [x] Optional ACE caption override and fixed per-segment seed plans preserve existing defaults when omitted.
+- [x] F23 local workbench edits and auditions per-segment ACE/RVC candidates, persists approvals, and merges only after every segment is approved.
+- [x] F23 passed 30 unit tests, real unhappy v10 integration merge, and complete browser UI merge verification with WAV/MP3/report outputs.
 
 ### 进行中
-- [ ] ?????? runs/unhappy_custom_fixed_v9/final_feibi_song.wav ? MP3 ?????????
+- [ ] F23 实现与三层验证全部完成，等待提交。
 
 ### 已知问题
 - 没有 CloudMist/OpenAI API Key，本次歌词改写使用 local_rule_fallback，F12 仍未验收；
@@ -26,7 +25,4 @@
 - 当前 RMS 覆盖率会把 Demucs 人声轨中的乐器泄漏误判为唱声；必须新增真实人声存在性判定，不能再把覆盖率等同于连续演唱。
 
 ### 下一步
-1. ?????? unhappy v9；
-2. ?????????????? caption ? seed ??；
-3. ?? F22 ???????????；
-4. ????????。
+1. Commit the completed F23 workbench feature.。

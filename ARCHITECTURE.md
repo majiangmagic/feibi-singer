@@ -1,7 +1,7 @@
 # ARCHITECTURE.md
 
 ## 模块说明
-菲比演唱器是一个可插拔的本地音频流水线。输入歌曲和可选歌词后，流水线先做人声与伴奏分离；用户提供歌词时优先使用用户歌词，否则回退到 ASR；随后通过外部 LLM 或明确标记的本地规则回退改写菲比歌词，校验音节数和模式，再调用 ACE-Step 1.5 cover 生成新歌。为避免 RVC 改变伴奏，真实链路会再次分离 ACE-Step 输出，只转换歌声并混回伴奏。Demucs、ACE-Step、RVC 使用互相隔离的 D 盘 venv；真实 98.2 秒音频端到端已验证，CloudMist 分支仍需 API Key。
+菲比演唱器是一个可插拔的本地音频流水线。输入歌曲和可选歌词后，流水线先做人声与伴奏分离；用户提供歌词时优先使用用户歌词，否则回退到 ASR；随后通过外部 LLM 或明确标记的本地规则回退改写菲比歌词，校验音节数和模式，再调用 ACE-Step 1.5 cover 生成新歌。为避免 RVC 改变伴奏，真实链路会再次分离 ACE-Step 输出，只转换歌声并混回伴奏。Demucs、ACE-Step、RVC 使用互相隔离的 D 盘 venv；真实 98.2 秒音频端到端已验证，CloudMist 分支仍需 API Key。另提供基于既有时间轴运行的分段工作台，逐段管理 ACE 候选、RVC 动态升调、最佳结果确认和最终合并。
 
 ## 目录结构
 - `feibi_singer/models.py`：定义 PipelineConfig、PipelineProtocol、StageContract、StageResult 和 PipelineReport，并声明五个阶段的输入输出、占位符和环境变量协议；
@@ -25,6 +25,8 @@
 - `tests/`：覆盖菲比规则、多语言音节统计、dry-run 阶段产物、歌词优先级和协议配置的测试；
 - `harness/harness_context.py`：四类 Harness 文档的 JSON/Markdown 转换、回读、索引搜索和最新记录查询工具；
 - `harness/check.py`：递归检查四类文档是否存在、是否乱码以及 PROGRESS 各章节条目数量；
+- `feibi_singer/segment_workbench.py`：交互式分段工作台核心服务：从已完成时间轴运行导入缓存候选，持久化每段 ACE seed、caption、预设歌词、RVC 升调与确认结果，并将全部最佳片段交叉淡化、响度匹配后混回原伴奏；
+- `scripts/feibi_segment_ui.py`：Gradio 本地 UI 入口，逐段提供原音、ACE 和 RVC 试听、参数修改、候选历史、最佳结果确认，以及最终 WAV、MP3 和报告合并输出；
 
 ## 设计约束
 - pipeline.py 只负责阶段编排和报告，不直接实现外部模型推理；
@@ -38,5 +40,6 @@
 - ACE-Step 和 RVC 必须使用各自兼容的隔离 venv，模型和缓存统一放在 D 盘并由 .gitignore 排除；
 - RVC 只转换生成歌声轨，转换后再与生成伴奏混合，避免对整首伴奏做音色转换；
 - 默认真实方案必须保留原始伴奏，按原分离人声检测到的起止区间动态分段生成歌声并交叉淡化对齐；ACE 候选必须通过逐秒 RMS 覆盖率门槛并优先搜索到 100% 覆盖率，所有片段统一执行 RVC +4；旧整曲直通方案只能显式启用；
+- 分段工作台必须从已完成的时间轴运行导入原始分段和原伴奏；每段 ACE 与 RVC 结果独立持久化，只有所有分段都明确选定最佳结果后才能执行最终合并；
 - RVC 模型和索引统一使用配置路径，示例默认指向仓库 models/rvc/；
 - ARCHITECTURE.md、PROGRESS.md、FEATURES.md、DECISIONS.md 必须通过 harness/harness_context.py 从 JSON 生成；FEATURES.md 和 DECISIONS.md 的读取及索引使用脚本；

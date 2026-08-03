@@ -8,288 +8,545 @@
     {
       "id": "F01",
       "title": "干运行五阶段流水线",
-      "keywords": ["dry-run", "流水线", "阶段计划", "CLI"],
+      "keywords": [
+        "dry-run",
+        "流水线",
+        "阶段计划",
+        "CLI"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "核心流程",
       "user_visible_behavior": "用户无需安装真实外部引擎即可预览五阶段执行顺序、输入输出和歌词改写结果。",
       "status": "passing",
-      "verification_steps": ["运行流水线测试。", "使用带歌词输入执行 CLI dry-run。", "确认阶段状态为 planned 或 skipped。"],
+      "verification_steps": [
+        "运行流水线测试。",
+        "使用带歌词输入执行 CLI dry-run。",
+        "确认阶段状态为 planned 或 skipped。"
+      ],
       "verification_evidence": "tests/test_pipeline.py 覆盖五阶段 dry-run；本轮 CLI dry-run 得到 planned、skipped、planned、planned、planned。",
       "notes": "dry-run 不生成或伪造真实音频。"
     },
     {
       "id": "F02",
       "title": "Harness 文档转换与状态同步",
-      "keywords": ["Harness", "JSON", "Markdown", "round-trip", "中文"],
+      "keywords": [
+        "Harness",
+        "JSON",
+        "Markdown",
+        "round-trip",
+        "中文"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "文档",
       "user_visible_behavior": "四份项目文档由结构化 JSON 生成并可回读，中文内容和代码状态能够持续同步。",
       "status": "passing",
-      "verification_steps": ["从 JSON 生成四份 Markdown。", "将四份 Markdown 回读为 JSON。", "比较源 JSON 和回读 JSON。", "运行索引查询和 harness/check.py。"],
+      "verification_steps": [
+        "从 JSON 生成四份 Markdown。",
+        "将四份 Markdown 回读为 JSON。",
+        "比较源 JSON 和回读 JSON。",
+        "运行索引查询和 harness/check.py。"
+      ],
       "verification_evidence": "四份文档 round-trip 结构一致，FEATURES latest、DECISIONS search 和 harness/check.py 已通过。",
       "notes": "固定格式 Markdown 不直接手工编辑。"
     },
     {
       "id": "F03",
       "title": "用户歌词优先策略",
-      "keywords": ["歌词来源", "用户歌词", "ASR", "优先级"],
+      "keywords": [
+        "歌词来源",
+        "用户歌词",
+        "ASR",
+        "优先级"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "歌词来源",
       "user_visible_behavior": "用户提供歌词时系统直接使用该歌词，并明确跳过 ASR。",
       "status": "passing",
-      "verification_steps": ["运行带歌词 dry-run。", "确认 lyric_source 为 user_provided。", "确认 ASR 阶段为 skipped 且原因是 user_lyrics_provided。"],
+      "verification_steps": [
+        "运行带歌词 dry-run。",
+        "确认 lyric_source 为 user_provided。",
+        "确认 ASR 阶段为 skipped 且原因是 user_lyrics_provided。"
+      ],
       "verification_evidence": "test_dry_run_skips_asr_when_user_lyrics_exist 已通过。",
       "notes": "避免歌曲 ASR 误差污染歌词改写。"
     },
     {
       "id": "F04",
       "title": "版本化五阶段执行协议",
-      "keywords": ["PipelineProtocol", "StageContract", "协议", "阶段顺序"],
+      "keywords": [
+        "PipelineProtocol",
+        "StageContract",
+        "协议",
+        "阶段顺序"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "集成协议",
       "user_visible_behavior": "每个外部阶段具有固定名称、顺序、用途、输入输出、必需字段和命令占位符。",
       "status": "passing",
-      "verification_steps": ["构建 PipelineProtocol。", "检查五个 StageContract。", "确认 protocol.json 写入运行目录。"],
+      "verification_steps": [
+        "构建 PipelineProtocol。",
+        "检查五个 StageContract。",
+        "确认 protocol.json 写入运行目录。"
+      ],
       "verification_evidence": "test_pipeline_protocol_exposes_command_templates 已通过，dry-run 已生成 feibi.pipeline.v1 的 protocol.json。",
       "notes": "阶段顺序为 separation、asr、lyric_rewrite、ace_step_lyric_edit、rvc_voice_conversion。"
     },
     {
       "id": "F05",
       "title": "真实音频端到端执行",
-      "keywords": ["真实执行", "分离", "ASR", "LLM", "ACE-Step", "RVC", "端到端"],
+      "keywords": [
+        "真实执行",
+        "分离",
+        "ASR",
+        "LLM",
+        "ACE-Step",
+        "RVC",
+        "端到端"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "端到端",
       "user_visible_behavior": "用户提交真实歌曲后可以得到经过分离、歌词获取与改写、歌曲生成和菲比音色转换的最终音频。",
       "status": "passing",
-      "verification_steps": ["配置所有真实外部引擎和凭据。", "依次完成单元测试和集成测试。", "使用真实音频执行完整流水线。", "试听并检查 final_feibi_song.wav。"],
+      "verification_steps": [
+        "配置所有真实外部引擎和凭据。",
+        "依次完成单元测试和集成测试。",
+        "使用真实音频执行完整流水线。",
+        "试听并检查 final_feibi_song.wav。"
+      ],
       "verification_evidence": "已使用 98.2 秒真实 MP3 完成 Demucs 分离、faster-whisper 转写、本地规则歌词回退、ACE-Step 1.5 cover、RVC 人声转换和最终混音；runs/unhappy_full/report.json 记录完整证据。",
       "notes": "本次因没有 CloudMist/OpenAI API Key 使用 local_rule_fallback，云端 LLM 功能仍由 F12 单独保持 blocked。"
     },
     {
       "id": "F06",
       "title": "菲比歌词音节和模式校验",
-      "keywords": ["歌词规则", "音节", "多语言", "菲比模式", "校验"],
+      "keywords": [
+        "歌词规则",
+        "音节",
+        "多语言",
+        "菲比模式",
+        "校验"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "歌词规则",
       "user_visible_behavior": "系统能按中英日韩混合文本的启发式音节数生成和检查菲比歌词，并拒绝音节或模式不匹配的行。",
       "status": "passing",
-      "verification_steps": ["运行 tests/test_rules.py。", "验证中文、英文和日文音节统计。", "验证模式和音节错误会被拒绝。"],
+      "verification_steps": [
+        "运行 tests/test_rules.py。",
+        "验证中文、英文和日文音节统计。",
+        "验证模式和音节错误会被拒绝。"
+      ],
       "verification_evidence": "tests/test_rules.py 的多语言音节、模式识别和改写校验均通过。",
       "notes": "音节统计是可替换的启发式实现。"
     },
     {
       "id": "F07",
       "title": "CLI 输入、歌词和配置入口",
-      "keywords": ["CLI", "input", "lyrics", "config", "no-asr-fallback"],
+      "keywords": [
+        "CLI",
+        "input",
+        "lyrics",
+        "config",
+        "no-asr-fallback"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "命令行",
       "user_visible_behavior": "用户可以从命令行指定音频、输出目录、可选歌词、JSON 配置、dry-run 和是否禁用 ASR 回退。",
       "status": "passing",
-      "verification_steps": ["运行 scripts/feibi_pipeline.py --help。", "使用 input、lyrics、output-dir 和 dry-run 执行命令。", "确认输出 JSON 报告。"],
+      "verification_steps": [
+        "运行 scripts/feibi_pipeline.py --help。",
+        "使用 input、lyrics、output-dir 和 dry-run 执行命令。",
+        "确认输出 JSON 报告。"
+      ],
       "verification_evidence": "本轮 CLI dry-run 成功读取音频和歌词并生成 report.json。",
       "notes": "真实运行需要额外传入完整配置。"
     },
     {
       "id": "F08",
       "title": "ASR 回退开关和空歌词处理",
-      "keywords": ["ASR", "fallback", "no-asr-fallback", "空歌词", "skipped"],
+      "keywords": [
+        "ASR",
+        "fallback",
+        "no-asr-fallback",
+        "空歌词",
+        "skipped"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "歌词来源",
       "user_visible_behavior": "未提供歌词时用户可以启用 ASR，也可以显式关闭回退并获得可观测的 skipped 状态。",
       "status": "passing",
-      "verification_steps": ["无歌词且关闭回退执行 dry-run。", "确认 lyric_source 为 empty。", "确认 ASR 原因为 fallback_disabled。"],
+      "verification_steps": [
+        "无歌词且关闭回退执行 dry-run。",
+        "确认 lyric_source 为 empty。",
+        "确认 ASR 原因为 fallback_disabled。"
+      ],
       "verification_evidence": "test_dry_run_can_disable_asr_fallback 已通过。",
       "notes": "真实运行在没有任何歌词来源时会阻止歌词改写。"
     },
     {
       "id": "F09",
       "title": "运行清单和阶段可观测性",
-      "keywords": ["manifest", "request.json", "stage.json", "stdout", "stderr", "日志"],
+      "keywords": [
+        "manifest",
+        "request.json",
+        "stage.json",
+        "stdout",
+        "stderr",
+        "日志"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "可观测性",
       "user_visible_behavior": "每次运行保存输入清单、协议、阶段请求、阶段状态、解析后命令以及标准输出和错误日志。",
       "status": "passing",
-      "verification_steps": ["执行 dry-run 并检查 manifest、protocol 和五个 stage.json。", "检查真实执行路径会写 stdout.log 和 stderr.log。", "确认 StageResult 保存状态和错误详情。"],
+      "verification_steps": [
+        "执行 dry-run 并检查 manifest、protocol 和五个 stage.json。",
+        "检查真实执行路径会写 stdout.log 和 stderr.log。",
+        "确认 StageResult 保存状态和错误详情。"
+      ],
       "verification_evidence": "test_pipeline.py 已检查核心阶段文件；ExternalAdapter 实现 request、stage、stdout、stderr 和 resolved_command 落盘。",
       "notes": "真实 stdout 和 stderr 需在配置引擎后验证内容。"
     },
     {
       "id": "F10",
       "title": "真实人声和伴奏分离",
-      "keywords": ["audio-separator", "separation", "vocals", "instrumental", "stem"],
+      "keywords": [
+        "audio-separator",
+        "separation",
+        "vocals",
+        "instrumental",
+        "stem"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "音频分离",
       "user_visible_behavior": "系统使用 Demucs 或 audio-separator 将输入歌曲拆分为标准 vocals.wav 和 instrumental.wav。",
       "status": "passing",
-      "verification_steps": ["在隔离 venv 中运行 Demucs CUDA。", "使用真实歌曲执行分离。", "确认两个 stem 时长、响度和路径正确。"],
+      "verification_steps": [
+        "在隔离 venv 中运行 Demucs CUDA。",
+        "使用真实歌曲执行分离。",
+        "确认两个 stem 时长、响度和路径正确。"
+      ],
       "verification_evidence": "已用 Demucs htdemucs CUDA 分离真实 98.2 秒 MP3，人声与伴奏均为 98.25 秒且不是空轨；ACE-Step 输出也完成二次人声分离。",
       "notes": "audio-separator 模型清单站连接被重置，因此本次使用项目允许的 Demucs 后端。"
     },
     {
       "id": "F11",
       "title": "faster-whisper 多语种转写",
-      "keywords": ["faster-whisper", "ASR", "transcript", "language", "segments"],
+      "keywords": [
+        "faster-whisper",
+        "ASR",
+        "transcript",
+        "language",
+        "segments"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "语音识别",
       "user_visible_behavior": "没有用户歌词时，系统对分离后的人声轨进行多语种识别并输出带时间段的 JSON 和纯文本歌词。",
       "status": "passing",
-      "verification_steps": ["安装 faster-whisper。", "配置 asr_engine_command。", "对真实人声轨执行识别。", "检查 transcript.json、transcript.txt、语言和 segments。"],
+      "verification_steps": [
+        "安装 faster-whisper。",
+        "配置 asr_engine_command。",
+        "对真实人声轨执行识别。",
+        "检查 transcript.json、transcript.txt、语言和 segments。"
+      ],
       "verification_evidence": "已用 faster-whisper small CPU int8 转写真实分离人声，输出 11 行 transcript 和时间段 JSON，识别为英语，语言置信度约 94.6%。",
       "notes": "CTranslate2 CUDA 缺 cublas64_12.dll，因此本次从 GPU 自动回退 CPU；支持 model、device、compute type、beam size 和 language 参数。"
     },
     {
       "id": "F12",
       "title": "CloudMist 菲比歌词改写",
-      "keywords": ["CloudMist", "OpenAI-compatible", "LLM", "歌词改写", "API Key"],
+      "keywords": [
+        "CloudMist",
+        "OpenAI-compatible",
+        "LLM",
+        "歌词改写",
+        "API Key"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "歌词生成",
       "user_visible_behavior": "系统调用 OpenAI-compatible API，按输入行数、音节和菲比模式要求生成改写歌词。",
       "status": "passing",
-      "verification_steps": ["配置 CLOUDMIST_API_KEY 或 OPENAI_API_KEY。", "提交多语言歌词。", "检查 llm_request.json 和 llm_response.json。", "确认 rewritten_lines 行数匹配并通过本地校验。"],
+      "verification_steps": [
+        "配置 CLOUDMIST_API_KEY 或 OPENAI_API_KEY。",
+        "提交多语言歌词。",
+        "检查 llm_request.json 和 llm_response.json。",
+        "确认 rewritten_lines 行数匹配并通过本地校验。"
+      ],
       "verification_evidence": "scripts/feibi_llm_cloudmist.py 已实现提示词、请求、JSON 提取和行数规范化，但缺少有效 API Key 和真实请求证据。",
       "notes": "默认 API base 为 CloudMist，默认模型为 gpt-4o。"
     },
     {
       "id": "F13",
       "title": "ACE-Step 1.5 仅改词生成",
-      "keywords": ["ACE-Step", "lyric_edit", "cover", "HTTP API", "歌曲生成"],
+      "keywords": [
+        "ACE-Step",
+        "lyric_edit",
+        "cover",
+        "HTTP API",
+        "歌曲生成"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "歌曲生成",
       "user_visible_behavior": "系统将伴奏和已校验歌词送入 ACE-Step，仅改歌词并生成新的歌曲音频。",
       "status": "blocked",
-      "verification_steps": ["配置 ace_step_engine_command。", "启动官方 ACE-Step API 或配置本地模块命令。", "提交伴奏和改写歌词。", "确认 ace_step_output.wav 存在且可播放。"],
+      "verification_steps": [
+        "配置 ace_step_engine_command。",
+        "启动官方 ACE-Step API 或配置本地模块命令。",
+        "提交伴奏和改写歌词。",
+        "确认 ace_step_output.wav 存在且可播放。"
+      ],
       "verification_evidence": "已在独立 Python 3.11 venv 使用 ACE-Step 1.5 acestep-v15-turbo、INT8、CPU offload 和 RTX 5060 生成 98.16 秒真实 cover，显存峰值约 4.76 GB。",
       "notes": "scripts/feibi_ace_step_v15.py 提供非交互 cover engine；cover 自动跳过 ACE-Step LM。"
     },
     {
       "id": "F14",
       "title": "RVC 菲比音色转换",
-      "keywords": ["RVC", "rvc_infer", "pth", "index", "音色转换"],
+      "keywords": [
+        "RVC",
+        "rvc_infer",
+        "pth",
+        "index",
+        "音色转换"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "音色转换",
       "user_visible_behavior": "系统使用仓库内菲比 .pth 权重和 .index 索引，把 ACE-Step 输出转换为 final_feibi_song.wav。",
       "status": "passing",
-      "verification_steps": ["配置 rvc_engine_command。", "确认模型和索引路径存在。", "安装并修复 rvc_infer runtime。", "执行转换并试听最终音频。"],
+      "verification_steps": [
+        "配置 rvc_engine_command。",
+        "确认模型和索引路径存在。",
+        "安装并修复 rvc_infer runtime。",
+        "执行转换并试听最终音频。"
+      ],
       "verification_evidence": "已在独立 Python 3.10 venv 加载菲比 .pth、.index、HuBERT 和 RMVPE，对 98.14 秒生成歌声执行 CUDA 转换，推理约 8.81 秒并输出 converted_vocals.wav。",
       "notes": "最终将转换后人声与 ACE-Step 伴奏重新混为 48 kHz 24-bit 立体声；模型文件约 57.6 MB，索引约 9.9 MB。"
     },
     {
       "id": "F15",
       "title": "真实执行前配置和模型校验",
-      "keywords": ["PipelineConfig", "配置校验", "命令校验", "RVC 路径", "fail-fast"],
+      "keywords": [
+        "PipelineConfig",
+        "配置校验",
+        "命令校验",
+        "RVC 路径",
+        "fail-fast"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "配置",
       "user_visible_behavior": "真实运行开始前系统检查必需 wrapper、backend、engine 命令以及 RVC 模型和索引，缺失时立即报告。",
       "status": "passing",
-      "verification_steps": ["使用空 PipelineConfig 请求真实执行校验。", "确认缺失命令产生 ValueError。", "使用不存在的 RVC 路径并确认 FileNotFoundError。"],
+      "verification_steps": [
+        "使用空 PipelineConfig 请求真实执行校验。",
+        "确认缺失命令产生 ValueError。",
+        "使用不存在的 RVC 路径并确认 FileNotFoundError。"
+      ],
       "verification_evidence": "test_pipeline_config_validation_for_real_run 和 test_pipeline_config_checks_rvc_paths 已通过。",
       "notes": "示例配置仍需用户补齐 engine 命令才能通过真实执行校验。"
     },
     {
       "id": "F16",
       "title": "外部命令模板和环境变量传递",
-      "keywords": ["占位符", "环境变量", "FEIBI_", "backend", "engine", "repo_root"],
+      "keywords": [
+        "占位符",
+        "环境变量",
+        "FEIBI_",
+        "backend",
+        "engine",
+        "repo_root"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "集成协议",
       "user_visible_behavior": "外部工具通过稳定占位符和 FEIBI_* 环境变量获得运行目录、阶段目录、请求、输入、输出、配置和下层命令。",
       "status": "passing",
-      "verification_steps": ["检查命令模板多轮解析。", "检查 FEIBI_STAGE、RUN_DIR、REQUEST_JSON、INPUTS_JSON 和 OUTPUTS_JSON。", "检查 backend 和 engine 命令按阶段传递。"],
+      "verification_steps": [
+        "检查命令模板多轮解析。",
+        "检查 FEIBI_STAGE、RUN_DIR、REQUEST_JSON、INPUTS_JSON 和 OUTPUTS_JSON。",
+        "检查 backend 和 engine 命令按阶段传递。"
+      ],
       "verification_evidence": "models.py 定义协议环境变量，adapters.py 实现模板渲染和环境注入，协议占位符测试通过。",
       "notes": "实际 engine 命令由部署环境配置。"
     },
     {
       "id": "F17",
       "title": "外部命令失败和缺产物检测",
-      "keywords": ["returncode", "missing_outputs", "失败", "日志", "StageResult"],
+      "keywords": [
+        "returncode",
+        "missing_outputs",
+        "失败",
+        "日志",
+        "StageResult"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "错误处理",
       "user_visible_behavior": "外部命令返回非零或没有写出声明产物时，阶段被标记 failed 并保留原因和日志，真实流水线停止。",
       "status": "passing",
-      "verification_steps": ["检查 ExternalAdapter 的返回码处理。", "检查声明输出存在性检查。", "检查 pipeline 对必需阶段调用 _require_stage_ok。"],
+      "verification_steps": [
+        "检查 ExternalAdapter 的返回码处理。",
+        "检查声明输出存在性检查。",
+        "检查 pipeline 对必需阶段调用 _require_stage_ok。"
+      ],
       "verification_evidence": "ExternalAdapter 已实现 command_failed 和 missing_outputs，external.py 各 wrapper 也检查 backend 返回码与产物；compileall 通过。",
       "notes": "后续应增加真实失败命令的集成测试。"
     },
     {
       "id": "F18",
       "title": "歌词改写输出规范化",
-      "keywords": ["rewritten_lines", "JSON", "行数", "规范化", "validation"],
+      "keywords": [
+        "rewritten_lines",
+        "JSON",
+        "行数",
+        "规范化",
+        "validation"
+      ],
       "date": "2026-08-01",
       "priority": 2,
       "area": "歌词生成",
       "user_visible_behavior": "LLM 返回代码块、嵌套 JSON、过多或不足行时，系统尝试提取并调整为与源歌词相同的行数。",
       "status": "blocked",
-      "verification_steps": ["模拟纯 JSON、Markdown 代码块和混合文本响应。", "覆盖输出行数过多和不足。", "确认规范化结果仍经过本地歌词校验。"],
+      "verification_steps": [
+        "模拟纯 JSON、Markdown 代码块和混合文本响应。",
+        "覆盖输出行数过多和不足。",
+        "确认规范化结果仍经过本地歌词校验。"
+      ],
       "verification_evidence": "scripts/feibi_llm_cloudmist.py 已实现 _extract_json 和 _normalize_output，但当前没有对应自动化测试或真实 API 验证。",
       "notes": "代码存在不等于功能已验收。"
     },
     {
       "id": "F19",
       "title": "统一结果汇总和最终产物索引",
-      "keywords": ["PipelineReport", "report.json", "outputs", "validation", "final_song"],
+      "keywords": [
+        "PipelineReport",
+        "report.json",
+        "outputs",
+        "validation",
+        "final_song"
+      ],
       "date": "2026-07-31",
       "priority": 1,
       "area": "结果汇总",
       "user_visible_behavior": "运行结束后用户获得 report.json，其中包含清单、阶段状态、源歌词、改写歌词、校验结果和所有关键产物路径。",
       "status": "passing",
-      "verification_steps": ["执行 dry-run。", "读取 report.json。", "确认 stages、source_lyrics、rewritten_lyrics、validation 和 outputs 字段。"],
+      "verification_steps": [
+        "执行 dry-run。",
+        "读取 report.json。",
+        "确认 stages、source_lyrics、rewritten_lyrics、validation 和 outputs 字段。"
+      ],
       "verification_evidence": "除 dry-run 测试外，runs/unhappy_full/report.json 已记录真实各阶段引擎、状态、产物及最终 WAV/MP3 音频指标。",
       "notes": "真实最终产物为 98.16 秒、48 kHz、24-bit 立体声，峰值 -1.7 dB。"
     },
     {
       "id": "F20",
       "title": "可直接运行的真实配置模板",
-      "keywords": ["config.example.json", "separation_backend_command", "engine_command", "配置模板"],
+      "keywords": [
+        "config.example.json",
+        "separation_backend_command",
+        "engine_command",
+        "配置模板"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "配置",
       "user_visible_behavior": "用户可以从示例配置直接看到并填写分离、ASR、LLM、ACE-Step 和 RVC 的完整 wrapper、backend、engine 命令。",
       "status": "blocked",
-      "verification_steps": ["补齐 separation_backend_command。", "补齐 asr_engine_command、ace_step_engine_command 和 rvc_engine_command。", "使用 PipelineConfig 读取示例。", "执行真实配置前置校验。"],
+      "verification_steps": [
+        "补齐 separation_backend_command。",
+        "补齐 asr_engine_command、ace_step_engine_command 和 rvc_engine_command。",
+        "使用 PipelineConfig 读取示例。",
+        "执行真实配置前置校验。"
+      ],
       "verification_evidence": "当前示例包含五个 wrapper 和四个 backend，但缺少 separation_backend_command 以及 ASR、ACE-Step、RVC engine 命令，尚不可直接真实运行。",
       "notes": "LLM backend 直接调用 API，因此通过环境变量提供凭据而不是独立 engine 命令。"
     },
     {
       "id": "F21",
       "title": "默认保留原伴奏并按原唱时间轴对齐",
-      "keywords": ["默认方案", "时间轴", "原始伴奏", "vocal window", "adelay", "RVC"],
+      "keywords": [
+        "默认方案",
+        "时间轴",
+        "原始伴奏",
+        "vocal window",
+        "adelay",
+        "RVC"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "核心流程",
       "user_visible_behavior": "非 dry-run 默认检测原唱首尾活动区间，只生成该演唱窗口，RVC 后按原起点补静音，并与原始伴奏混音。",
       "status": "passing",
-      "verification_steps": ["检测原分离人声的长前奏和长尾奏静音。", "只将演唱窗口送入 ACE-Step。", "确认对齐人声从原唱起点开始。", "确认最终混音使用原始伴奏并保持原曲时长。"],
+      "verification_steps": [
+        "检测原分离人声的长前奏和长尾奏静音。",
+        "只将演唱窗口送入 ACE-Step。",
+        "确认对齐人声从原唱起点开始。",
+        "确认最终混音使用原始伴奏并保持原曲时长。"
+      ],
       "verification_evidence": "统一 CLI 默认入口对真实 unhappy 音频自动检测到约 16.44-82.55 秒演唱窗口，report.json 返回 timeline_aligned_original_instrumental；动态测得原始人声 -12.5 LUFS、RVC 人声 -20.7 LUFS，自动应用 +8.2 dB，使两者达到 100% LUFS 匹配；动态增益测试及全部 14 项测试通过。",
       "notes": "scripts/feibi_pipeline.py 非 dry-run 默认调用 timeline_pipeline；默认混音按原始人声演唱区间的 LUFS 动态匹配，不再使用固定 2 dB；旧整曲 ACE/RVC 路径仅通过 --legacy-direct-pipeline 显式启用。"
     },
     {
       "id": "F22",
       "title": "动态分段 ACE-Step 与 RVC",
-      "keywords": ["动态切点", "分段生成", "ACE-Step", "RVC", "交叉淡化"],
+      "keywords": [
+        "动态切点",
+        "分段生成",
+        "ACE-Step",
+        "RVC",
+        "交叉淡化"
+      ],
       "date": "2026-08-01",
       "priority": 1,
       "area": "核心流程",
       "user_visible_behavior": "系统在约 15 秒目标附近寻找低能量拼接点，带重叠上下文逐段执行 ACE-Step 和 RVC，再将转换人声平滑拼回完整原伴奏。",
       "status": "passing",
-      "verification_steps": ["验证动态切点和歌词分配单元测试。", "验证分段命令、产物和报告集成流程。", "使用 unhappy 完整生成 WAV 和 MP3。", "由用户试听确认后完成验收。"],
+      "verification_steps": [
+        "验证动态切点和歌词分配单元测试。",
+        "验证分段命令、产物和报告集成流程。",
+        "使用 unhappy 完整生成 WAV 和 MP3。",
+        "由用户试听确认后完成验收。"
+      ],
       "verification_evidence": "22 项 pytest 通过；用户确认 RVC +2 比 +4 更适合当前菲比模型，并通过以普通话吐字和歌词可懂度为最高优先级的克制录音室 ACE 唱法。unhappy v5 第 3 段 seed 45、第 4 段 seed 48 的 Demucs 人声核心覆盖率均为 100%，完成 RVC +2、动态拼接和原伴奏混音。最终 WAV/MP3 均为 98.246542 秒、48 kHz，WAV 为 24-bit 立体声，MP3 为 320 kbps；用户试听后同意本地存档。",
       "notes": "采用 7.5 秒上下文、0.25 秒拼接把手和 seed 44、43、45-50 候选搜索池；程序运行时逐段搜索并按覆盖率、响度选择，不写死本次歌曲人工验收的 seed 45/48。RVC 统一升 2 半音。RMS 覆盖率仍可能把乐器泄漏误判为人声，后续需增加真实人声存在性和发音评分。"
+    },
+    {
+      "id": "F23",
+      "title": "交互式分段演唱工作台",
+      "keywords": [
+        "UI",
+        "ACE-Step",
+        "segment",
+        "seed",
+        "caption",
+        "lyrics",
+        "RVC",
+        "pitch",
+        "merge"
+      ],
+      "date": "2026-08-03",
+      "priority": 1,
+      "area": "交互式分段生成",
+      "user_visible_behavior": "本地 UI 读取既有分段运行，允许逐段修改 ACE-Step seed、caption 提示词和预设歌词，重新生成并试听 ACE；再修改每段 RVC 动态升调并试听，选定各段最佳结果后，与原始伴奏合并为完整歌曲。",
+      "status": "passing",
+      "verification_steps": [
+        "单元测试工作台状态持久化、输入校验和 ACE/RVC 命令构造。",
+        "用真实 unhappy v10 运行导入五段缓存候选，确认全部片段并通过工作台完成最终合并。",
+        "Start the local Gradio UI and verify segment switching, media paths, candidate loading, approval persistence, and final merge outputs in the browser."
+      ],
+      "verification_evidence": "30 pytest tests passed. The five cached candidates from unhappy_custom_fixed_v10 were merged through SegmentWorkbench into WAV, MP3, and JSON; original vocals measured -12.5 LUFS, converted vocals -17.9 LUFS, with +5.4 dB automatic gain. In Gradio 6.2.0 at 127.0.0.1:7860, browser verification covered seeds 44/46/45/48/49, RVC +2, all five approvals, and the final 98-second WAV/MP3 players plus downloadable JSON report.",
+      "notes": "第一版从已完成时间轴运行开始，复用原始分段、演唱时间和原伴奏；ACE-Step 与 RVC 继续使用各自隔离 venv。"
     }
   ]
 }

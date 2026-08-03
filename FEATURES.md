@@ -344,3 +344,18 @@
   4. 由用户试听确认后完成验收。。
 - 验证证据：22 项 pytest 通过；用户确认 RVC +2 比 +4 更适合当前菲比模型，并通过以普通话吐字和歌词可懂度为最高优先级的克制录音室 ACE 唱法。unhappy v5 第 3 段 seed 45、第 4 段 seed 48 的 Demucs 人声核心覆盖率均为 100%，完成 RVC +2、动态拼接和原伴奏混音。最终 WAV/MP3 均为 98.246542 秒、48 kHz，WAV 为 24-bit 立体声，MP3 为 320 kbps；用户试听后同意本地存档。。
 - 备注：采用 7.5 秒上下文、0.25 秒拼接把手和 seed 44、43、45-50 候选搜索池；程序运行时逐段搜索并按覆盖率、响度选择，不写死本次歌曲人工验收的 seed 45/48。RVC 统一升 2 半音。RMS 覆盖率仍可能把乐器泄漏误判为人声，后续需增加真实人声存在性和发音评分。。
+
+## F23：交互式分段演唱工作台
+
+- 索引：UI, ACE-Step, segment, seed, caption, lyrics, RVC, pitch, merge
+- 日期：2026-08-03
+- 优先级：1
+- 所属区域：`交互式分段生成`
+- 用户可见行为：本地 UI 读取既有分段运行，允许逐段修改 ACE-Step seed、caption 提示词和预设歌词，重新生成并试听 ACE；再修改每段 RVC 动态升调并试听，选定各段最佳结果后，与原始伴奏合并为完整歌曲。。
+- 状态：`passing`
+- 验证步骤：
+  1. 单元测试工作台状态持久化、输入校验和 ACE/RVC 命令构造。；
+  2. 用真实 unhappy v10 运行导入五段缓存候选，确认全部片段并通过工作台完成最终合并。；
+  3. Start the local Gradio UI and verify segment switching, media paths, candidate loading, approval persistence, and final merge outputs in the browser.。
+- 验证证据：30 pytest tests passed. The five cached candidates from unhappy_custom_fixed_v10 were merged through SegmentWorkbench into WAV, MP3, and JSON; original vocals measured -12.5 LUFS, converted vocals -17.9 LUFS, with +5.4 dB automatic gain. In Gradio 6.2.0 at 127.0.0.1:7860, browser verification covered seeds 44/46/45/48/49, RVC +2, all five approvals, and the final 98-second WAV/MP3 players plus downloadable JSON report.。
+- 备注：第一版从已完成时间轴运行开始，复用原始分段、演唱时间和原伴奏；ACE-Step 与 RVC 继续使用各自隔离 venv。。
