@@ -20,6 +20,7 @@ def make_run(tmp_path: Path, segment_count: int = 2) -> Path:
         for path in [segment_dir / "source.wav", candidate_dir / "ace_step_output.wav", vocals, segment_dir / "converted_vocals.wav"]:
             path.write_bytes(b"audio")
         (segment_dir / "lyrics.txt").write_text(f"line {index}\n", encoding="utf-8")
+        (segment_dir / "original_lyrics.txt").write_text(f"original line {index}\n", encoding="utf-8")
         segments.append(
             {
                 "index": index,
@@ -53,6 +54,8 @@ def test_workbench_loads_existing_segment_candidates(tmp_path):
     assert segment["default_seed"] == 44
     assert segment["default_caption"] == ACE_CAPTION
     assert segment["default_lyrics"] == "line 1"
+    assert segment["default_original_lyrics"] == "original line 1"
+    assert segment["flow_edit_available"] is True
     assert workbench.candidate_choices(1)[0][1] == "source-seed-44"
     assert workbench.rvc_choices(1, "source-seed-44")[0][1] == "source-f0-+2"
 
@@ -81,6 +84,10 @@ def test_ace_command_uses_segment_duration_and_custom_controls(tmp_path):
     assert command[command.index("--caption") + 1] == "custom caption"
     assert command[command.index("--duration") + 1] == "30.0"
     assert command[command.index("--lyrics") + 1] == str(lyrics)
+    assert command[command.index("--cover-strength") + 1] == "1.0"
+    assert "--flow-edit" in command
+    assert command[command.index("--flow-edit-source-lyrics") + 1] == "original line 2"
+    assert command[command.index("--flow-edit-source-caption") + 1] == ACE_CAPTION
 
 
 def test_preview_methods_return_original_melody_and_generated_melody_paths(tmp_path, monkeypatch):

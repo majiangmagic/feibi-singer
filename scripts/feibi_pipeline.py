@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--lyrics", type=Path)
+    parser.add_argument("--lyrics-text", help="lyrics text supplied directly instead of a file")
     parser.add_argument("--config", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-asr-fallback", action="store_true", help="skip ASR fallback when lyrics are provided")
@@ -36,7 +37,9 @@ def main() -> int:
     cfg = PipelineConfig()
     if args.config:
         cfg = PipelineConfig(**json.loads(args.config.read_text(encoding="utf-8-sig")))
-    lines = args.lyrics.read_text(encoding="utf-8-sig").splitlines() if args.lyrics else []
+    if args.lyrics and args.lyrics_text:
+        parser.error("use only one of --lyrics and --lyrics-text")
+    lines = args.lyrics.read_text(encoding="utf-8-sig").splitlines() if args.lyrics else (args.lyrics_text.splitlines() if args.lyrics_text else [])
     if not args.dry_run and not args.legacy_direct_pipeline:
         from feibi_singer.timeline_pipeline import run_timeline_pipeline
 

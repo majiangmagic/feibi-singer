@@ -112,6 +112,9 @@ def test_segment_plan_adds_context_without_exceeding_window():
     assert plan[0].lyrics == ("cat", "dog")
     assert plan[1].lyrics == ("cat", "dog", "pig")
     assert plan[2].lyrics == ("dog", "pig")
+    assert plan[0].line_indices == (0, 1)
+    assert plan[1].line_indices == (0, 1, 2)
+    assert plan[2].line_indices == (1, 2)
 
 
 def test_segment_plan_can_include_intro_and_outro_context():

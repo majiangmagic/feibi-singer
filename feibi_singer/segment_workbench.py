@@ -61,6 +61,24 @@ class SegmentWorkbench:
                 raise WorkbenchError(f"unsupported workbench state version: {state.get('version')}")
             if Path(state.get("source_run", "")).resolve() != self.run_dir:
                 raise WorkbenchError("workbench belongs to a different source run")
+            changed = False
+            for key, state_segment in state.get("segments", {}).items():
+                original_path = (
+                    self.run_dir / "stages" / "segmented_voice_conversion"
+                    / f"segment_{int(key):02d}" / "original_lyrics.txt"
+                )
+                if "default_original_lyrics" not in state_segment:
+                    state_segment["default_original_lyrics"] = (
+                        original_path.read_text(encoding="utf-8-sig").strip()
+                        if original_path.exists() else ""
+                    )
+                    state_segment["flow_edit_available"] = original_path.exists()
+                    changed = True
+                if "default_source_caption" not in state_segment:
+                    state_segment["default_source_caption"] = self.report.get("ace_source_caption") or state_segment["default_caption"]
+                    changed = True
+            if changed:
+                self._save_state(state)
             return state
 
         state: dict[str, Any] = {
@@ -77,6 +95,7 @@ class SegmentWorkbench:
             segment_dir = self.run_dir / "stages" / "segmented_voice_conversion" / f"segment_{index:02d}"
             source_audio = segment_dir / "source.wav"
             lyrics_path = segment_dir / "lyrics.txt"
+            original_lyrics_path = segment_dir / "original_lyrics.txt"
             if not source_audio.exists() or not lyrics_path.exists():
                 raise FileNotFoundError(source_audio if not source_audio.exists() else lyrics_path)
             selected_seed = item.get("selected_seed")
@@ -90,7 +109,13 @@ class SegmentWorkbench:
                 "source_audio": str(source_audio),
                 "default_seed": selected_seed if selected_seed is not None else 44,
                 "default_caption": default_caption,
+                "default_source_caption": self.report.get("ace_source_caption") or default_caption,
                 "default_lyrics": lyrics_path.read_text(encoding="utf-8-sig").strip(),
+                "default_original_lyrics": (
+                    original_lyrics_path.read_text(encoding="utf-8-sig").strip()
+                    if original_lyrics_path.exists() else ""
+                ),
+                "flow_edit_available": original_lyrics_path.exists(),
                 "default_f0_change": int(rvc_f0),
                 "candidates": [],
                 "approved": None,
@@ -245,7 +270,7 @@ class SegmentWorkbench:
     def ace_command(self, index: int, seed: int, caption: str, lyrics_path: Path, output: Path) -> list[str]:
         segment = self.segment(index)
         duration = float(segment["input_end"]) - float(segment["input_start"])
-        return [
+        command = [
             str(self.ace_python),
             str(self.repo_root / "scripts" / "feibi_ace_step_v15.py"),
             "--source-audio", str(Path(segment["source_audio"])),
@@ -255,9 +280,17 @@ class SegmentWorkbench:
             "--checkpoints-dir", str(self.repo_root / "models" / "ace_step" / "checkpoints"),
             "--caption", resolve_caption(caption),
             "--duration", str(duration),
-            "--cover-strength", "0.95",
-            "--seed", str(int(seed)),
+            "--cover-strength", "1.0",
         ]
+        original_lyrics = segment.get("default_original_lyrics", "").strip()
+        if segment.get("flow_edit_available") and original_lyrics:
+            command.extend([
+                "--flow-edit",
+                "--flow-edit-source-lyrics", original_lyrics,
+                "--flow-edit-source-caption", segment.get("default_source_caption") or segment["default_caption"],
+            ])
+        command.extend(["--seed", str(int(seed))])
+        return command
 
     def rvc_command(self, source: Path, f0_change: int, output: Path) -> list[str]:
         assets = self.repo_root / "models" / "rvc" / "assets"

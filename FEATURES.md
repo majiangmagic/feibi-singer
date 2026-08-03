@@ -351,11 +351,12 @@
 - 日期：2026-08-03
 - 优先级：1
 - 所属区域：`交互式分段生成`
-- 用户可见行为：本地 UI 读取既有分段运行，允许逐段修改 ACE-Step seed、caption 提示词和预设歌词，分别试听 ACE 原始生成旋律、ACE 人声叠加原旋律伴奏和 ACE 生成旋律；再修改每段 RVC 动态升调，分别试听 RVC 人声、RVC 叠加原旋律伴奏和纯人声，选定各段最佳结果后，与原始伴奏合并为完整歌曲。。
+- 用户可见行为：The local UI supports multiple song projects and from-scratch generation with direct multiline original-lyrics text. Each segment keeps aligned source and rewritten lyrics, then uses ACE-Step 1.5 cover plus flow-edit at cover strength 1.0 to preserve the source melody as closely as possible while replacing lyrics. Users can still edit each ACE seed, caption, target lyrics, and RVC pitch, preview candidates, approve them, and merge the song.。
 - 状态：`passing`
 - 验证步骤：
-  1. 单元测试工作台状态持久化、输入校验和 ACE/RVC 命令构造。；
-  2. 用真实 unhappy v10 运行导入五段缓存候选，确认全部片段并通过工作台完成最终合并。；
-  3. Start the local Gradio UI and verify segment switching, media paths, candidate loading, approval persistence, and final merge outputs in the browser.。
-- 验证证据：31 pytest tests passed. The five cached candidates from unhappy_custom_fixed_v10 were previewed with generated-melody and original-instrumental mixes for ACE and RVC; the workbench produced all four preview paths for every segment. Existing browser verification covered final merge outputs; the restarted UI exposes separate original-melody and generated-melody preview players.。
-- 备注：第一版从已完成时间轴运行开始，复用原始分段、演唱时间和原伴奏；ACE-Step 与 RVC 继续使用各自隔离 venv。。
+  1. Run unit tests for workbench persistence, validation, ACE/RVC commands, and previews.；
+  2. Verify that each segment aligns source and rewritten lyrics by the same line indices and sends flow-edit parameters to ACE-Step.；
+  3. Build the Gradio UI and confirm that from-scratch generation passes direct multiline lyrics text.；
+  4. Run the Harness check and verify the local service at 127.0.0.1:7860.。
+- 验证证据：34 pytest tests pass. ACE command tests cover strength 1.0, flow-edit source lyrics, and the source caption. Gradio UI construction passes in the ACE environment; the restarted local server responds with HTTP 200; Harness validation passes.。
+- 备注：The installed ACE-Step 1.5 runtime has no independent only_lyrics task, so this uses its supported cover plus flow-edit overlay. Older runs without original_lyrics.txt remain compatible and fall back to ordinary cover.。

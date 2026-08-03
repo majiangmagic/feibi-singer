@@ -109,7 +109,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         value = _song_id(wb().run_dir)
         return gr.update(choices=choices, value=value)
 
-    def generate_song(input_audio, lyrics_file, run_name, caption_override, seed_plan):
+    def generate_song(input_audio, lyrics_text, run_name, caption_override, seed_plan):
         def action():
             if not input_audio:
                 raise WorkbenchError("请先选择输入音频")
@@ -121,8 +121,8 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
                 raise WorkbenchError(f"运行目录已存在：{output_dir}")
             cmd = [sys.executable, str(Path(__file__).with_name("feibi_pipeline.py")),
                    "--input", str(Path(input_audio).resolve()), "--output-dir", str(output_dir)]
-            if lyrics_file:
-                cmd += ["--lyrics", str(Path(lyrics_file).resolve()), "--no-asr-fallback"]
+            if lyrics_text and lyrics_text.strip():
+                cmd += ["--lyrics-text", lyrics_text, "--no-asr-fallback"]
             if caption_override and caption_override.strip():
                 cmd += ["--caption", caption_override.strip()]
             if seed_plan and seed_plan.strip():
@@ -211,7 +211,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         gr.Markdown("## 从头开始生成（新歌曲会加入上面的项目列表）")
         with gr.Row():
             input_audio = gr.Audio(label="输入歌曲音频", type="filepath")
-            lyrics_file = gr.File(label="原始歌词文件（可选）", type="filepath")
+            lyrics_text = gr.Textbox(label="原始歌词文本（可选）", placeholder="直接输入多行原始歌词", lines=6)
         with gr.Row():
             run_name = gr.Textbox(label="输出运行名称", value="new_song")
             caption_override = gr.Textbox(label="Caption 覆盖（留空使用原默认值）")
@@ -259,7 +259,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         segment_index.change(load_segment, inputs=[segment_index], outputs=load_outputs)
         song.change(select_song, inputs=[song], outputs=[segment_index, *load_outputs, song_status])
         refresh.click(refresh_songs, outputs=[song])
-        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_file, run_name, caption_override, seed_plan], outputs=[song, segment_index, *load_outputs, song_status])
+        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song, segment_index, *load_outputs, song_status])
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics], outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         candidate.change(load_candidate, inputs=[segment_index, candidate], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])

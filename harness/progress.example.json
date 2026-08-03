@@ -2,24 +2,24 @@
   "current_status": {
     "latest_commit": {
       "hash": "working-tree",
-      "message": "repair multi-song segment workbench"
+      "message": "add ACE-Step flow-edit lyric replacement"
     },
-    "test_status": "34 pytest tests passing; UI config and Harness checks passing",
+    "test_status": "34 pytest tests passing; UI config, HTTP smoke test, and Harness checks passing",
     "lint": "Python compile checks passed in project and ACE venvs"
   },
   "completed": [
-    "The segment workbench supports ACE and RVC candidates with original-melody previews.",
-    "The UI supports multiple run projects and a from-scratch generation command.",
-    "Feibi lyric validation strictly follows the six user-defined grammars."
+    "The from-scratch UI accepts original lyrics as multiline text and passes them through --lyrics-text.",
+    "Timeline segments preserve aligned original and rewritten lyric lines for ACE-Step 1.5 cover flow-edit.",
+    "New and existing workbench runs use cover strength 1.0 plus flow-edit when original segment lyrics are available."
   ],
   "in_progress": [
-    "Restart the local UI and verify first-segment loading and project switching end to end."
+    "The feature is complete; the next real ACE generation will provide listening-based validation of melody preservation."
   ],
   "known_issues": [
-    "Real model generation remains dependent on the installed ACE-Step and RVC environments.",
-    "The first segment uses boundary-safe preview handling when the source starts at zero."
+    "ACE-Step does not expose an independent only_lyrics task; lyric replacement uses the supported cover plus flow-edit overlay.",
+    "Older cached runs without original_lyrics.txt remain compatible but cannot enable flow-edit automatically."
   ],
   "next_steps": [
-    "Run browser verification against the local Gradio server."
+    "Use the UI to create a new song run with direct original-lyrics text and audition flow-edit candidates."
   ]
 }
