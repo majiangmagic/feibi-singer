@@ -87,7 +87,7 @@ def test_ace_command_uses_segment_duration_and_custom_controls(tmp_path):
     assert command[command.index("--cover-strength") + 1] == "1.0"
     assert "--flow-edit" in command
     assert command[command.index("--flow-edit-source-lyrics") + 1] == "original line 2"
-    assert command[command.index("--flow-edit-source-caption") + 1] == ACE_CAPTION
+    assert command[command.index("--flow-edit-source-caption") + 1] == "custom caption"
 
 
 def test_preview_methods_return_original_melody_and_generated_melody_paths(tmp_path, monkeypatch):

@@ -304,10 +304,14 @@ class SegmentWorkbench:
         ]
         original_lyrics = segment.get("default_original_lyrics", "").strip()
         if segment.get("flow_edit_available") and original_lyrics:
+            # Keep the target and source musical caption identical.  Flow-edit
+            # then computes the meaningful delta from lyrics only, while the
+            # source audio remains the primary melody/rhythm anchor.
+            source_caption = resolve_caption(caption)
             command.extend([
                 "--flow-edit",
                 "--flow-edit-source-lyrics", original_lyrics,
-                "--flow-edit-source-caption", segment.get("default_source_caption") or segment["default_caption"],
+                "--flow-edit-source-caption", source_caption,
             ])
         command.extend(["--seed", str(int(seed))])
         return command
