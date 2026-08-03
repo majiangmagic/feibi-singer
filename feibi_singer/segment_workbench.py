@@ -77,6 +77,11 @@ class SegmentWorkbench:
                 if "default_source_caption" not in state_segment:
                     state_segment["default_source_caption"] = self.report.get("ace_source_caption") or state_segment["default_caption"]
                     changed = True
+                if state_segment.get("approved") is None:
+                    default_approval = self._default_approval(state_segment)
+                    if default_approval is not None:
+                        state_segment["approved"] = default_approval
+                        changed = True
             if changed:
                 self._save_state(state)
             return state
@@ -121,6 +126,7 @@ class SegmentWorkbench:
                 "approved": None,
             }
             self._add_existing_candidate(state_segment, segment_dir, selected_seed, int(rvc_f0))
+            state_segment["approved"] = self._default_approval(state_segment)
             state["segments"][str(index)] = state_segment
         self._save_state(state)
         return state
@@ -163,6 +169,35 @@ class SegmentWorkbench:
                 }
             )
         segment["candidates"].append(candidate)
+
+    @staticmethod
+    def _default_approval(segment: dict[str, Any]) -> dict[str, Any] | None:
+        """Return the original pipeline result as the initial selection.
+
+        A fresh workbench should be merge-ready for unchanged segments: the
+        first pipeline ACE/RVC result is the default until the user explicitly
+        chooses another candidate.  Later ACE candidates are never selected
+        implicitly.
+        """
+        candidates = segment.get("candidates") or []
+        if not candidates:
+            return None
+        candidate = candidates[0]
+        results = candidate.get("rvc_results") or []
+        if not results:
+            return None
+        result = results[0]
+        return {
+            "candidate_id": candidate["id"],
+            "rvc_id": result["id"],
+            "seed": candidate["seed"],
+            "caption": candidate["caption"],
+            "lyrics": candidate["lyrics"],
+            "f0_change": result["f0_change"],
+            "audio": result["audio"],
+            "approved_at": _now(),
+            "selection_source": "default_initial_pipeline_result",
+        }
 
     def _save_state(self, state: dict[str, Any] | None = None) -> None:
         if state is not None:

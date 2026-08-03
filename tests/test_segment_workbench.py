@@ -58,6 +58,10 @@ def test_workbench_loads_existing_segment_candidates(tmp_path):
     assert segment["flow_edit_available"] is True
     assert workbench.candidate_choices(1)[0][1] == "source-seed-44"
     assert workbench.rvc_choices(1, "source-seed-44")[0][1] == "source-f0-+2"
+    approved = workbench.segment(1)["approved"]
+    assert approved["candidate_id"] == "source-seed-44"
+    assert approved["rvc_id"] == "source-f0-+2"
+    assert "Segment 2: seed 44, pitch +2, source-seed-44" in workbench.approval_summary()
 
 
 def test_workbench_persists_approved_candidate(tmp_path):
@@ -140,6 +144,7 @@ def test_generate_ace_rejects_blank_preset_lyrics(tmp_path):
 def test_merge_requires_every_segment_to_be_approved(tmp_path):
     workbench = SegmentWorkbench(make_run(tmp_path))
     workbench.approve(1, "source-seed-44", "source-f0-+2")
+    workbench.segment(2)["approved"] = None
 
     with pytest.raises(WorkbenchError, match=r"missing: \[2\]"):
         workbench.merge_approved()
