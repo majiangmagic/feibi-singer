@@ -101,14 +101,26 @@ def test_preview_methods_return_original_melody_and_generated_melody_paths(tmp_p
         Path(command[-1]).write_bytes(b"preview")
 
     monkeypatch.setattr("feibi_singer.segment_workbench._run", fake_run)
-    ace = workbench.ace_preview(1, "source-seed-44")
-    rvc = workbench.rvc_preview(1, "source-seed-44", "source-f0-+2")
+    ace = workbench.ace_preview(1, "source-seed-44", 6)
+    rvc = workbench.rvc_preview(1, "source-seed-44", "source-f0-+2", -3)
 
+    assert "voice_p6.0dB" in ace["with_original"]
+    assert "voice_m3.0dB" in rvc["with_original"]
     assert Path(ace["with_original"]).exists()
     assert Path(ace["generated_melody"]).exists()
     assert Path(rvc["with_original"]).exists()
     assert Path(rvc["vocal_only"]).exists()
     assert len(calls) == 3
+    mix_filters = [command[command.index("-filter_complex") + 1] for command in calls if "-filter_complex" in command]
+    assert any("volume=+6.0dB[voc]" in value for value in mix_filters)
+    assert any("volume=-3.0dB[voc]" in value for value in mix_filters)
+
+
+def test_preview_vocal_gain_rejects_values_outside_ui_range(tmp_path):
+    workbench = SegmentWorkbench(make_run(tmp_path))
+
+    with pytest.raises(WorkbenchError, match=r"between -6 and \+12 dB"):
+        workbench.ace_preview(1, "source-seed-44", 13)
 
 
 def test_rvc_command_uses_per_segment_pitch(tmp_path):

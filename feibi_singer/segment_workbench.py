@@ -196,11 +196,26 @@ class SegmentWorkbench:
                 return result
         raise WorkbenchError(f"unknown RVC result for segment {index}: {rvc_id}")
 
-    def _preview_paths(self, index: int, candidate_id: str, rvc_id: str | None = None) -> tuple[Path, Path]:
+    @staticmethod
+    def _validate_preview_vocal_gain(voice_gain_db: float) -> float:
+        gain = float(voice_gain_db)
+        if not -6.0 <= gain <= 12.0:
+            raise WorkbenchError("preview vocal gain must be between -6 and +12 dB")
+        return gain
+
+    def _preview_paths(
+        self,
+        index: int,
+        candidate_id: str,
+        rvc_id: str | None = None,
+        voice_gain_db: float = 0.0,
+    ) -> tuple[Path, Path]:
+        gain = self._validate_preview_vocal_gain(voice_gain_db)
         base = self.workbench_dir / f"segment_{int(index):02d}" / "previews" / candidate_id
+        gain_suffix = "" if gain == 0.0 else f"_voice_{gain:+.1f}dB".replace("+", "p").replace("-", "m")
         if rvc_id is None:
-            return base / "ace_with_original_melody.wav", base / "ace_generated_melody.wav"
-        return base / f"{rvc_id}_with_original_melody.wav", base / f"{rvc_id}_vocal_only.wav"
+            return base / f"ace_with_original_melody{gain_suffix}.wav", base / "ace_generated_melody.wav"
+        return base / f"{rvc_id}_with_original_melody{gain_suffix}.wav", base / f"{rvc_id}_vocal_only.wav"
 
     def _original_instrumental_preview(self, index: int, output: Path) -> Path:
         segment = self.segment(index)
@@ -218,37 +233,42 @@ class SegmentWorkbench:
         ])
         return output
 
-    def _mix_preview(self, backing: Path, voice: Path, output: Path) -> Path:
+    def _mix_preview(self, backing: Path, voice: Path, output: Path, voice_gain_db: float = 0.0) -> Path:
+        gain = self._validate_preview_vocal_gain(voice_gain_db)
         output.parent.mkdir(parents=True, exist_ok=True)
         _run([
             "ffmpeg", "-y", "-v", "error", "-i", str(backing), "-i", str(voice),
             "-filter_complex",
             "[0:a]aresample=48000,volume=0.85[inst];"
-            "[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=1.0[voc];"
+            f"[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume={gain:+.1f}dB[voc];"
             "[inst][voc]amix=inputs=2:duration=first:normalize=0,volume=0.9,alimiter=limit=0.8913:level=false[out]",
             "-map", "[out]", "-c:a", "pcm_s24le", str(output),
         ])
         return output
 
-    def ace_preview(self, index: int, candidate_id: str) -> dict[str, str]:
+    def ace_preview(self, index: int, candidate_id: str, voice_gain_db: float = 0.0) -> dict[str, str]:
         candidate = self.candidate(index, candidate_id)
-        with_original, generated = self._preview_paths(index, candidate_id)
+        with_original, generated = self._preview_paths(index, candidate_id, voice_gain_db=voice_gain_db)
         generated.parent.mkdir(parents=True, exist_ok=True)
         if not generated.exists():
             shutil.copyfile(candidate["ace_audio"], generated)
         backing = self._original_instrumental_preview(
             index, with_original.parent / "original_instrumental.wav"
         )
-        self._mix_preview(Path(backing), Path(candidate["ace_vocals"]), with_original)
+        self._mix_preview(Path(backing), Path(candidate["ace_vocals"]), with_original, voice_gain_db)
         return {"with_original": str(with_original), "generated_melody": str(generated)}
 
-    def rvc_preview(self, index: int, candidate_id: str, rvc_id: str) -> dict[str, str]:
+    def rvc_preview(
+        self, index: int, candidate_id: str, rvc_id: str, voice_gain_db: float = 0.0
+    ) -> dict[str, str]:
         result = self.rvc_result(index, candidate_id, rvc_id)
-        with_original, vocal_only = self._preview_paths(index, candidate_id, rvc_id)
+        with_original, vocal_only = self._preview_paths(
+            index, candidate_id, rvc_id, voice_gain_db=voice_gain_db
+        )
         backing = self._original_instrumental_preview(
             index, with_original.parent / "original_instrumental.wav"
         )
-        self._mix_preview(Path(backing), Path(result["audio"]), with_original)
+        self._mix_preview(Path(backing), Path(result["audio"]), with_original, voice_gain_db)
         vocal_only.parent.mkdir(parents=True, exist_ok=True)
         if not vocal_only.exists():
             shutil.copyfile(result["audio"], vocal_only)

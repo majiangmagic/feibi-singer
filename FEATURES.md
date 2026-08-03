@@ -351,12 +351,13 @@
 - 日期：2026-08-03
 - 优先级：1
 - 所属区域：`交互式分段生成`
-- 用户可见行为：The local UI supports multiple song projects and direct multiline original lyrics. Automatic Feibi rewriting now uses all six approved grammars when their minimum lengths fit the source line, preserves the source syllable count, and deterministically distributes repeated Fei, Bi, and Jiu tokens. Users can then edit each segment seed, caption, target lyrics, and RVC pitch before approving and merging.。
+- 用户可见行为：The local UI supports multiple song projects and direct multiline original lyrics. Automatic Feibi rewriting now uses all six approved grammars when their minimum lengths fit the source line, preserves the source syllable count, and deterministically distributes repeated Fei, Bi, and Jiu tokens. Users can then edit each segment seed, caption, target lyrics, and RVC pitch before approving and merging. The workbench also provides a per-preview vocal gain slider from -6 to +12 dB for ACE/RVC plus-original-melody audition.。
 - 状态：`passing`
 - 验证步骤：
   1. Verify strict acceptance and rejection for the six approved grammars.；
   2. Verify that four-syllable lines cycle through all six families.；
   3. Verify that long lines cycle through all five length-flexible families with exact syllable preservation.；
-  4. Run the complete test suite, Python compilation, and Harness validation.。
-- 验证证据：38 pytest tests pass, including all-six-family coverage for four-syllable lines, five-family coverage for long lines, the reported eight-line long-song regression, repetition distribution, strict grammar validation, and exact syllable preservation. Python compilation, git diff checks, and Harness validation pass.。
-- 备注：Generation is deterministic by line index rather than random. Fei-Ba-Fen-Qian is fixed at four syllables; the other five families expand according to their plus-marked groups.。
+  4. Run the complete test suite, Python compilation, and Harness validation.；
+  5. Verify the preview vocal-gain slider regenerates ACE/RVC plus-original-melody previews and enforces -6 to +12 dB.。
+- 验证证据：39 pytest tests pass, including preview gain range validation and ffmpeg gain-filter assertions; Python compilation and UI construction with the ACE-Step environment pass.。
+- 备注：Generation is deterministic by line index rather than random. Fei-Ba-Fen-Qian is fixed at four syllables; the other five families expand according to their plus-marked groups. Preview-only vocal gain is encoded into separate cached WAV paths; final merge keeps its existing LUFS matching.。
