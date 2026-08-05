@@ -261,7 +261,8 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             message = f"ACE ?????{job.get('error', '????')}?????????? ace_step.log"
             with generation_lock:
                 ace_jobs.pop(keys[0], None)
-            return tuple([gr.update()] * 9 + [gr.update(value="????????? ACE", interactive=True)])[:-1] + (message, gr.update(value="????????? ACE", interactive=True))
+            return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+                    message, gr.update(value="????????? ACE", interactive=True))
         result = job["result"]
         with generation_lock:
             ace_jobs.pop(keys[0], None)
@@ -346,6 +347,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             seed_plan = gr.Textbox(label="Seed 计划（可选，如 44,46,45）")
         generate_song_button = gr.Button("从头开始生成歌曲", variant="primary")
         generation_timer = gr.Timer(2.0)
+        ace_timer = gr.Timer(1.0)
         with gr.Row():
             segment_index = gr.Dropdown(choices=segment_choices(), value=first, label="选择 15 秒分段", interactive=True)
             timing = gr.Textbox(label="分段时间", interactive=False)
@@ -395,7 +397,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song_status, generate_song_button])
         generation_timer.tick(poll_generation, outputs=[song, segment_index, *load_outputs, song_status, generate_song_button])
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics, voice_gain_db], outputs=[status, generate_ace_button])
-        generation_timer.tick(poll_ace_generation, outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status, generate_ace_button])
+        ace_timer.tick(poll_ace_generation, outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status, generate_ace_button])
         candidate.input(load_candidate, inputs=[segment_index, candidate, voice_gain_db], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change, voice_gain_db], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         rvc_result.input(load_rvc, inputs=[segment_index, candidate, rvc_result, voice_gain_db], outputs=[rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
