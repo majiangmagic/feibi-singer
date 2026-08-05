@@ -415,6 +415,10 @@ class SegmentWorkbench:
                 cwd=self.repo_root,
                 env=env,
             )
+            if not ace_audio.exists() or ace_audio.stat().st_size == 0:
+                raise WorkbenchError(
+                    f"ACE-Step ?????????????{ace_audio}??????{candidate_dir / 'ace_step.log'}"
+                )
             demucs_dir = candidate_dir / "demucs"
             _run_logged(
                 [
