@@ -155,15 +155,15 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         with generation_lock:
             job = generation_jobs.get(job_key)
         if not job:
-            return tuple([gr.update()] * 20)
+            return tuple([gr.update()] * 21)
         status = job.get("status", "starting")
         if status not in {"completed", "failed"}:
-            message = f"generation {status}: {job['output_dir']} (log: {job['output_dir']}\\pipeline.log)"
-            return tuple([gr.update()] * 19 + [message])
+            message = f"\u6b63\u5728\u751f\u6210\uff1a{job['output_dir']}\uff08\u65e5\u5fd7\uff1a{job['output_dir']}\\pipeline.log\uff09"
+            return tuple([gr.update()] * 19 + [message, gr.update(value="\u751f\u6210\u4e2d\u2026", interactive=False)])
         if status == "failed":
-            detail = job.get("error") or f"exit code {job.get('returncode')}"
-            message = f"generation failed: {detail}; log: {job['output_dir']}\\pipeline.log"
-            return tuple([gr.update()] * 19 + [message])
+            detail = job.get("error") or f"\u9000\u51fa\u7801 {job.get('returncode')}"
+            message = f"\u4ece\u5934\u751f\u6210\u5931\u8d25\uff1a{detail}\uff1b\u65e5\u5fd7\uff1a{job['output_dir']}\\pipeline.log"
+            return tuple([gr.update()] * 19 + [message, gr.update(value="\u4ece\u5934\u5f00\u59cb\u751f\u6210\u6b4c\u66f2", interactive=True)])
         output_dir = Path(job["output_dir"])
         try:
             new_wb = SegmentWorkbench(output_dir, output_dir / "workbench")
@@ -175,19 +175,20 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
                 generation_jobs.pop(job_key, None)
             return (gr.update(choices=song_choices(), value=key),
                     gr.update(choices=new_wb.segment_indices, value=first), *segment_values(first),
-                    f"generation completed: {output_dir} (log: {output_dir / 'pipeline.log'})")
+                    f"\u4ece\u5934\u751f\u6210\u5b8c\u6210\uff1a{output_dir}\uff08\u65e5\u5fd7\uff1a{output_dir / 'pipeline.log'}\uff09",
+                    gr.update(value="\u4ece\u5934\u5f00\u59cb\u751f\u6210\u6b4c\u66f2", interactive=True))
         except Exception as exc:
-            message = f"generation finished but result could not be loaded: {exc}; log: {output_dir / 'pipeline.log'}"
-            return tuple([gr.update()] * 19 + [message])
+            message = f"\u751f\u6210\u5df2\u7ed3\u675f\u4f46\u65e0\u6cd5\u52a0\u8f7d\u7ed3\u679c\uff1a{exc}\uff1b\u65e5\u5fd7\uff1a{output_dir / 'pipeline.log'}"
+            return tuple([gr.update()] * 19 + [message, gr.update(value="\u4ece\u5934\u5f00\u59cb\u751f\u6210\u6b4c\u66f2", interactive=True)])
 
     def generate_song(input_audio, lyrics_text, run_name, caption_override, seed_plan):
         def action():
             if not input_audio:
-                raise WorkbenchError("select an input audio file first")
+                raise WorkbenchError("\u8bf7\u5148\u9009\u62e9\u8f93\u5165\u97f3\u9891")
             name = "".join(ch for ch in (run_name or "new_song").strip() if ch.isalnum() or ch in "-_ ").strip() or "new_song"
             output_dir = workspace_dir / name
             if output_dir.exists() and any(output_dir.iterdir()):
-                raise WorkbenchError(f"output directory already exists and is not empty: {output_dir}")
+                raise WorkbenchError(f"\u8fd0\u884c\u76ee\u5f55\u5df2\u5b58\u5728\u4e14\u975e\u7a7a\uff1a{output_dir}")
             cmd = [sys.executable, str(Path(__file__).with_name("feibi_pipeline.py")),
                    "--input", str(Path(input_audio).resolve()), "--output-dir", str(output_dir)]
             if lyrics_text and lyrics_text.strip():
@@ -199,17 +200,18 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             key = _song_id(output_dir)
             with generation_lock:
                 if any(item.get("status") in {"starting", "running"} for item in generation_jobs.values()):
-                    raise WorkbenchError("another full generation is already running")
+                    raise WorkbenchError("\u5df2\u6709\u4ece\u5934\u751f\u6210\u4efb\u52a1\u6b63\u5728\u8fd0\u884c")
                 generation_jobs[key] = {"status": "starting", "output_dir": str(output_dir)}
             threading.Thread(target=_run_generation, args=(key, cmd, output_dir), daemon=True).start()
-            return f"generation started: {output_dir} (log: {output_dir / 'pipeline.log'}); existing previews are kept until the new run finishes"
+            return (f"\u6b63\u5728\u4ece\u5934\u751f\u6210\uff1a{output_dir}\uff1b\u65e7\u8bd5\u542c\u5c06\u4fdd\u7559\uff0c\u5b8c\u6210\u540e\u81ea\u52a8\u66ff\u6362\uff08\u65e5\u5fd7\uff1a{output_dir / 'pipeline.log'}\uff09",
+                    gr.update(value="\u751f\u6210\u4e2d\u2026", interactive=False))
         return safe(action)
 
     def poll_generation():
         with generation_lock:
             keys = list(generation_jobs)
         if not keys:
-            return tuple([gr.update()] * 20)
+            return tuple([gr.update()] * 21)
         return _generation_result(keys[0])
 
     def generate_ace(index, seed, caption, lyrics, voice_gain_db=0.0):
@@ -347,8 +349,8 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         segment_index.change(load_segment, inputs=[segment_index], outputs=load_outputs)
         song.change(select_song, inputs=[song], outputs=[segment_index, *load_outputs, song_status])
         refresh.click(refresh_songs, outputs=[song])
-        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song_status])
-        generation_timer.tick(poll_generation, outputs=[song, segment_index, *load_outputs, song_status])
+        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song_status, generate_song_button])
+        generation_timer.tick(poll_generation, outputs=[song, segment_index, *load_outputs, song_status, generate_song_button])
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics, voice_gain_db], outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         candidate.input(load_candidate, inputs=[segment_index, candidate, voice_gain_db], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change, voice_gain_db], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
