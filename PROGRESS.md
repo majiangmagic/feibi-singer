@@ -1,4 +1,4 @@
-# PROGRESS.md
+﻿# PROGRESS.md
 
 ## 项目进度
 
@@ -24,3 +24,5 @@
 
 ### 下一步
 1. Run Harness validation and restart the local UI.。
+
+- [x] Full-song generation now runs in a background worker with persistent pipeline.log/pipeline_status.json and polling-based completion/failure updates, instead of holding the Gradio callback in processing.

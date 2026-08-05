@@ -1,10 +1,12 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
 import json
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,8 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
     sessions = _discover(workspace_dir)
     sessions.setdefault(_song_id(workbench.run_dir), workbench)
     current = {"value": workbench}
+    generation_jobs: dict[str, dict[str, Any]] = {}
+    generation_lock = threading.Lock()
 
     def wb() -> SegmentWorkbench:
         return current["value"]
@@ -109,16 +113,81 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         value = _song_id(wb().run_dir)
         return gr.update(choices=choices, value=value)
 
+    def _write_generation_status(output_dir: Path, status: str, **extra: Any) -> None:
+        payload = {"status": status, "updated_at": time.time(), **extra}
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "pipeline_status.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+    def _run_generation(job_key: str, cmd: list[str], output_dir: Path) -> None:
+        log_path = output_dir / "pipeline.log"
+        try:
+            _write_generation_status(output_dir, "starting", command=cmd)
+            with log_path.open("w", encoding="utf-8", errors="replace") as log:
+                log.write("$ " + subprocess.list2cmdline(cmd) + "\n\n")
+                log.flush()
+                process = subprocess.Popen(
+                    cmd, cwd=str(Path(__file__).parents[1]), stdout=log, stderr=subprocess.STDOUT,
+                    text=True, encoding="utf-8", errors="replace"
+                )
+                with generation_lock:
+                    generation_jobs[job_key].update({"process": process, "status": "running", "started_at": time.time()})
+                _write_generation_status(output_dir, "running", pid=process.pid, log=str(log_path))
+                returncode = process.wait()
+            if returncode != 0:
+                _write_generation_status(output_dir, "failed", returncode=returncode, log=str(log_path))
+                with generation_lock:
+                    generation_jobs[job_key].update({"status": "failed", "returncode": returncode})
+                return
+            if not (output_dir / "report.json").exists():
+                raise WorkbenchError("pipeline exited successfully but report.json is missing")
+            _write_generation_status(output_dir, "completed", returncode=0, log=str(log_path))
+            with generation_lock:
+                generation_jobs[job_key].update({"status": "completed", "returncode": 0})
+        except Exception as exc:
+            message = str(exc)
+            _write_generation_status(output_dir, "failed", error=message, log=str(log_path))
+            with generation_lock:
+                generation_jobs[job_key].update({"status": "failed", "error": message})
+
+    def _generation_result(job_key: str):
+        with generation_lock:
+            job = generation_jobs.get(job_key)
+        if not job:
+            return tuple([gr.update()] * 20)
+        status = job.get("status", "starting")
+        if status not in {"completed", "failed"}:
+            message = f"generation {status}: {job['output_dir']} (log: {job['output_dir']}\\pipeline.log)"
+            return tuple([gr.update()] * 19 + [message])
+        if status == "failed":
+            detail = job.get("error") or f"exit code {job.get('returncode')}"
+            message = f"generation failed: {detail}; log: {job['output_dir']}\\pipeline.log"
+            return tuple([gr.update()] * 19 + [message])
+        output_dir = Path(job["output_dir"])
+        try:
+            new_wb = SegmentWorkbench(output_dir, output_dir / "workbench")
+            key = _song_id(output_dir)
+            sessions[key] = new_wb
+            current["value"] = new_wb
+            first = new_wb.segment_indices[0]
+            with generation_lock:
+                generation_jobs.pop(job_key, None)
+            return (gr.update(choices=song_choices(), value=key),
+                    gr.update(choices=new_wb.segment_indices, value=first), *segment_values(first),
+                    f"generation completed: {output_dir} (log: {output_dir / 'pipeline.log'})")
+        except Exception as exc:
+            message = f"generation finished but result could not be loaded: {exc}; log: {output_dir / 'pipeline.log'}"
+            return tuple([gr.update()] * 19 + [message])
+
     def generate_song(input_audio, lyrics_text, run_name, caption_override, seed_plan):
         def action():
             if not input_audio:
-                raise WorkbenchError("请先选择输入音频")
-            name = "".join(ch for ch in (run_name or "new_song").strip() if ch.isalnum() or ch in "-_ ").strip()
-            if not name:
-                name = "new_song"
+                raise WorkbenchError("select an input audio file first")
+            name = "".join(ch for ch in (run_name or "new_song").strip() if ch.isalnum() or ch in "-_ ").strip() or "new_song"
             output_dir = workspace_dir / name
-            if output_dir.exists() and (output_dir / "report.json").exists():
-                raise WorkbenchError(f"运行目录已存在：{output_dir}")
+            if output_dir.exists() and any(output_dir.iterdir()):
+                raise WorkbenchError(f"output directory already exists and is not empty: {output_dir}")
             cmd = [sys.executable, str(Path(__file__).with_name("feibi_pipeline.py")),
                    "--input", str(Path(input_audio).resolve()), "--output-dir", str(output_dir)]
             if lyrics_text and lyrics_text.strip():
@@ -127,19 +196,22 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
                 cmd += ["--caption", caption_override.strip()]
             if seed_plan and seed_plan.strip():
                 cmd += ["--seed-plan", seed_plan.strip()]
-            completed = subprocess.run(cmd, cwd=str(Path(__file__).parents[1]), text=True,
-                                       capture_output=True, encoding="utf-8", errors="replace")
-            if completed.returncode:
-                raise WorkbenchError((completed.stderr or completed.stdout)[-4000:])
-            new_wb = SegmentWorkbench(output_dir, output_dir / "workbench")
             key = _song_id(output_dir)
-            sessions[key] = new_wb
-            current["value"] = new_wb
-            first = new_wb.segment_indices[0]
-            return (gr.update(choices=song_choices(), value=key),
-                    gr.update(choices=new_wb.segment_indices, value=first), *segment_values(first),
-                    f"从头生成完成：{output_dir}")
+            with generation_lock:
+                if any(item.get("status") in {"starting", "running"} for item in generation_jobs.values()):
+                    raise WorkbenchError("another full generation is already running")
+                generation_jobs[key] = {"status": "starting", "output_dir": str(output_dir)}
+            threading.Thread(target=_run_generation, args=(key, cmd, output_dir), daemon=True).start()
+            return (gr.update(), gr.update(), *([gr.update()] * 17),
+                    f"generation started: {output_dir} (log: {output_dir / 'pipeline.log'})")
         return safe(action)
+
+    def poll_generation():
+        with generation_lock:
+            keys = list(generation_jobs)
+        if not keys:
+            return tuple([gr.update()] * 20)
+        return _generation_result(keys[0])
 
     def generate_ace(index, seed, caption, lyrics, voice_gain_db=0.0):
         def action():
@@ -229,6 +301,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             caption_override = gr.Textbox(label="Caption 覆盖（留空使用原默认值）")
             seed_plan = gr.Textbox(label="Seed 计划（可选，如 44,46,45）")
         generate_song_button = gr.Button("从头开始生成歌曲", variant="primary")
+        generation_timer = gr.Timer(2.0)
         with gr.Row():
             segment_index = gr.Dropdown(choices=segment_choices(), value=first, label="选择 15 秒分段", interactive=True)
             timing = gr.Textbox(label="分段时间", interactive=False)
@@ -276,6 +349,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         song.change(select_song, inputs=[song], outputs=[segment_index, *load_outputs, song_status])
         refresh.click(refresh_songs, outputs=[song])
         generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song, segment_index, *load_outputs, song_status])
+        generation_timer.tick(poll_generation, outputs=[song, segment_index, *load_outputs, song_status])
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics, voice_gain_db], outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         candidate.input(load_candidate, inputs=[segment_index, candidate, voice_gain_db], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change, voice_gain_db], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
