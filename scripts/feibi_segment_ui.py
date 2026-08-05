@@ -45,6 +45,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
     current = {"value": workbench}
     generation_jobs: dict[str, dict[str, Any]] = {}
     ace_jobs: dict[str, dict[str, Any]] = {}
+    rvc_jobs: dict[str, dict[str, Any]] = {}
     generation_lock = threading.Lock()
 
     def wb() -> SegmentWorkbench:
@@ -215,58 +216,38 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             return tuple([gr.update()] * 21)
         return _generation_result(keys[0])
 
-    def _run_ace_generation(job_key: str, index: int, seed: int, caption: str, lyrics: str, voice_gain_db: float) -> None:
+    def _run_ace_generation(job_key, index, seed, caption, lyrics, voice_gain_db):
         try:
-            with generation_lock:
-                ace_jobs[job_key]["status"] = "running"
+            with generation_lock: ace_jobs[job_key]["status"] = "running"
             candidate = wb().generate_ace(index, seed, caption, lyrics)
             previews = wb().ace_preview(index, candidate["id"], voice_gain_db)
-            result = (gr.update(choices=wb().candidate_choices(index), value=candidate["id"]),
-                      candidate["ace_audio"], previews["with_original"], previews["generated_melody"],
-                      gr.update(choices=[], value=None), None, None, None,
-                      f"ACE ????{candidate['id']}???? ACE+??? ? ACE ?????")
-            with generation_lock:
-                ace_jobs[job_key].update({"status": "completed", "result": result})
+            result = (gr.update(choices=wb().candidate_choices(index), value=candidate["id"]), candidate["ace_audio"], previews["with_original"], previews["generated_melody"], gr.update(choices=[], value=None), None, None, None, f"ACE \u5df2\u751f\u6210\uff1a{candidate['id']}\u3002\u8bf7\u8bd5\u542c ACE+\u539f\u65cb\u5f8b \u4e0e ACE \u751f\u6210\u65cb\u5f8b\u3002")
+            with generation_lock: ace_jobs[job_key].update(status="completed", result=result)
         except Exception as exc:
-            with generation_lock:
-                ace_jobs[job_key].update({"status": "failed", "error": str(exc)})
+            with generation_lock: ace_jobs[job_key].update(status="failed", error=str(exc))
 
     def generate_ace(index, seed, caption, lyrics, voice_gain_db=0.0):
         def action():
-            if not lyrics or not str(lyrics).strip():
-                raise WorkbenchError("ACE ????????")
-            key = f"{int(index)}:{time.time_ns()}"
+            if not lyrics or not str(lyrics).strip(): raise WorkbenchError("ACE \u9884\u8bbe\u6b4c\u8bcd\u4e0d\u80fd\u4e3a\u7a7a")
+            key=f"{int(index)}:{time.time_ns()}"
             with generation_lock:
-                if any(item.get("status") in {"starting", "running"} for item in ace_jobs.values()):
-                    raise WorkbenchError("?? ACE ??????????????")
-                ace_jobs[key] = {"status": "starting", "index": int(index)}
-            threading.Thread(
-                target=_run_ace_generation,
-                args=(key, int(index), int(seed), caption or "", lyrics or "", float(voice_gain_db)),
-                daemon=True,
-            ).start()
-            return ("ACE ?????????????????????", gr.update(value="ACE ????", interactive=False))
+                if any(j.get("status") in {"starting","running"} for j in ace_jobs.values()): raise WorkbenchError("\u5df2\u6709 ACE \u751f\u6210\u4efb\u52a1\u6b63\u5728\u8fd0\u884c\uff0c\u8bf7\u7b49\u5f85\u5b8c\u6210")
+                ace_jobs[key]={"status":"starting"}
+            threading.Thread(target=_run_ace_generation,args=(key,int(index),int(seed),caption or "",lyrics or "",float(voice_gain_db)),daemon=True).start()
+            return "ACE \u751f\u6210\u4e2d\u2026\u65e7\u64ad\u653e\u5668\u6682\u65f6\u4fdd\u7559\uff0c\u5b8c\u6210\u540e\u81ea\u52a8\u66ff\u6362",gr.update(value="ACE \u751f\u6210\u4e2d\u2026",interactive=False)
         return safe(action)
 
     def poll_ace_generation():
-        with generation_lock:
-            keys = list(ace_jobs)
-            job = ace_jobs.get(keys[0]) if keys else None
-        if not job:
-            return tuple([gr.update()] * 10)
-        status = job.get("status")
-        if status in {"starting", "running"}:
-            return tuple([gr.update()] * 9 + [gr.update(value="ACE ????", interactive=False)])
-        if status == "failed":
-            message = f"ACE ?????{job.get('error', '????')}?????????? ace_step.log"
-            with generation_lock:
-                ace_jobs.pop(keys[0], None)
-            return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
-                    message, gr.update(value="????????? ACE", interactive=True))
-        result = job["result"]
-        with generation_lock:
-            ace_jobs.pop(keys[0], None)
-        return (*result, gr.update(value="????????? ACE", interactive=True))
+        with generation_lock: keys=list(ace_jobs); job=ace_jobs.get(keys[0]) if keys else None
+        if not job: return tuple([gr.update()]*10)
+        if job["status"] in {"starting","running"}: return tuple([gr.update()]*9+[gr.update(value="ACE \u751f\u6210\u4e2d\u2026",interactive=False)])
+        if job["status"]=="failed":
+            msg=f"ACE \u751f\u6210\u5931\u8d25\uff1a{job.get('error','????')}\u3002\u65e7\u64ad\u653e\u5668\u672a\u66ff\u6362\uff0c\u8bf7\u68c0\u67e5 ace_step.log"
+            with generation_lock: ace_jobs.pop(keys[0],None)
+            return tuple([gr.update()]*8+[msg,gr.update(value="\u91cd\u65b0\u751f\u6210 ACE",interactive=True)])
+        result=job["result"]
+        with generation_lock: ace_jobs.pop(keys[0],None)
+        return (*result,gr.update(value="\u91cd\u65b0\u751f\u6210 ACE",interactive=True))
 
     def load_candidate(index, candidate_id, voice_gain_db=0.0):
         if not candidate_id:
@@ -286,16 +267,38 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
                     gr.update(choices=[], value=None), None, None, None, "已加载 ACE 候选，尚无 RVC 结果")
         return safe(action)
 
+    def _run_rvc_generation(job_key, index, candidate_id, f0_change, voice_gain_db):
+        try:
+            with generation_lock: rvc_jobs[job_key]["status"]="running"
+            result=wb().generate_rvc(index,candidate_id,f0_change)
+            previews=wb().rvc_preview(index,candidate_id,result["id"],voice_gain_db)
+            payload=(gr.update(choices=wb().rvc_choices(index,candidate_id),value=result["id"]),result["audio"],previews["with_original"],previews["vocal_only"],f"RVC \u5df2\u751f\u6210\uff1a\u52a8\u6001\u5347\u8c03 {result['f0_change']:+d} \u534a\u97f3")
+            with generation_lock: rvc_jobs[job_key].update(status="completed",result=payload)
+        except Exception as exc:
+            with generation_lock: rvc_jobs[job_key].update(status="failed",error=str(exc))
+
     def generate_rvc(index, candidate_id, f0_change, voice_gain_db=0.0):
-        if not candidate_id:
-            raise gr.Error("请先选择 ACE 候选")
         def action():
-            result = wb().generate_rvc(int(index), candidate_id, int(f0_change))
-            previews = wb().rvc_preview(int(index), candidate_id, result["id"], voice_gain_db)
-            return (gr.update(choices=wb().rvc_choices(int(index), candidate_id), value=result["id"]),
-                    result["audio"], previews["with_original"], previews["vocal_only"],
-                    f"RVC 已生成：动态升调 {result['f0_change']:+d} 半音")
+            if not candidate_id: raise WorkbenchError("\u8bf7\u5148\u9009\u62e9 ACE \u5019\u9009")
+            key=f"{int(index)}:{time.time_ns()}"
+            with generation_lock:
+                if any(j.get("status") in {"starting","running"} for j in rvc_jobs.values()): raise WorkbenchError("\u5df2\u6709 RVC \u751f\u6210\u4efb\u52a1\u6b63\u5728\u8fd0\u884c\uff0c\u8bf7\u7b49\u5f85\u5b8c\u6210")
+                rvc_jobs[key]={"status":"starting"}
+            threading.Thread(target=_run_rvc_generation,args=(key,int(index),candidate_id,int(f0_change),float(voice_gain_db)),daemon=True).start()
+            return "RVC \u751f\u6210\u4e2d\u2026\u65e7\u64ad\u653e\u5668\u6682\u65f6\u4fdd\u7559\uff0c\u5b8c\u6210\u540e\u81ea\u52a8\u66ff\u6362",gr.update(value="RVC \u751f\u6210\u4e2d\u2026",interactive=False)
         return safe(action)
+
+    def poll_rvc_generation():
+        with generation_lock: keys=list(rvc_jobs); job=rvc_jobs.get(keys[0]) if keys else None
+        if not job: return tuple([gr.update()]*6)
+        if job["status"] in {"starting","running"}: return tuple([gr.update()]*5+[gr.update(value="RVC \u751f\u6210\u4e2d\u2026",interactive=False)])
+        if job["status"]=="failed":
+            msg=f"RVC \u751f\u6210\u5931\u8d25\uff1a{job.get('error','????')}\u3002\u65e7\u64ad\u653e\u5668\u672a\u66ff\u6362\uff0c\u8bf7\u68c0\u67e5 RVC \u65e5\u5fd7"
+            with generation_lock: rvc_jobs.pop(keys[0],None)
+            return tuple([gr.update()]*4+[msg,gr.update(value="\u7528\u5f53\u524d ACE \u751f\u6210 RVC",interactive=True)])
+        result=job["result"]
+        with generation_lock: rvc_jobs.pop(keys[0],None)
+        return (*result,gr.update(value="\u7528\u5f53\u524d ACE \u751f\u6210 RVC",interactive=True))
 
     def load_rvc(index, candidate_id, rvc_id, voice_gain_db=0.0):
         if not candidate_id or not rvc_id:
@@ -348,6 +351,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         generate_song_button = gr.Button("从头开始生成歌曲", variant="primary")
         generation_timer = gr.Timer(2.0)
         ace_timer = gr.Timer(1.0)
+        rvc_timer = gr.Timer(1.0)
         with gr.Row():
             segment_index = gr.Dropdown(choices=segment_choices(), value=first, label="选择 15 秒分段", interactive=True)
             timing = gr.Textbox(label="分段时间", interactive=False)
@@ -399,7 +403,8 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics, voice_gain_db], outputs=[status, generate_ace_button])
         ace_timer.tick(poll_ace_generation, outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status, generate_ace_button])
         candidate.input(load_candidate, inputs=[segment_index, candidate, voice_gain_db], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
-        generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change, voice_gain_db], outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
+        generate_rvc_button.click(generate_rvc, inputs=[segment_index, candidate, f0_change, voice_gain_db], outputs=[status, generate_rvc_button])
+        rvc_timer.tick(poll_rvc_generation, outputs=[rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status, generate_rvc_button])
         rvc_result.input(load_rvc, inputs=[segment_index, candidate, rvc_result, voice_gain_db], outputs=[rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         voice_gain_db.release(update_preview_gain, inputs=[segment_index, candidate, rvc_result, voice_gain_db], outputs=[ace_original_audio, rvc_original_audio, preview_gain_status])
         approve_button.click(approve, inputs=[segment_index, candidate, rvc_result], outputs=[status, approval_summary])
