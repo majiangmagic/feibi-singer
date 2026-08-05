@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -202,8 +202,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
                     raise WorkbenchError("another full generation is already running")
                 generation_jobs[key] = {"status": "starting", "output_dir": str(output_dir)}
             threading.Thread(target=_run_generation, args=(key, cmd, output_dir), daemon=True).start()
-            return (gr.update(), gr.update(), *([gr.update()] * 17),
-                    f"generation started: {output_dir} (log: {output_dir / 'pipeline.log'})")
+            return f"generation started: {output_dir} (log: {output_dir / 'pipeline.log'}); existing previews are kept until the new run finishes"
         return safe(action)
 
     def poll_generation():
@@ -348,7 +347,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
         segment_index.change(load_segment, inputs=[segment_index], outputs=load_outputs)
         song.change(select_song, inputs=[song], outputs=[segment_index, *load_outputs, song_status])
         refresh.click(refresh_songs, outputs=[song])
-        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song, segment_index, *load_outputs, song_status])
+        generate_song_button.click(generate_song, inputs=[input_audio, lyrics_text, run_name, caption_override, seed_plan], outputs=[song_status])
         generation_timer.tick(poll_generation, outputs=[song, segment_index, *load_outputs, song_status])
         generate_ace_button.click(generate_ace, inputs=[segment_index, seed, caption, lyrics, voice_gain_db], outputs=[candidate, ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
         candidate.input(load_candidate, inputs=[segment_index, candidate, voice_gain_db], outputs=[ace_audio, ace_original_audio, ace_generated_audio, rvc_result, rvc_audio, rvc_original_audio, rvc_vocal_only_audio, status])
