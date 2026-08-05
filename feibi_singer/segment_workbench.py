@@ -32,6 +32,22 @@ def _run(command: list[str], **kwargs: Any) -> None:
     subprocess.run(command, check=True, **kwargs)
 
 
+def _run_logged(command: list[str], log_path: Path, timeout: float, **kwargs: Any) -> None:
+    """Run a generation subprocess with durable logs and a bounded runtime."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    env = kwargs.pop("env", None)
+    cwd = kwargs.pop("cwd", None)
+    try:
+        with log_path.open("w", encoding="utf-8", errors="replace") as log:
+            log.write("$ " + subprocess.list2cmdline(command) + "\n")
+            log.flush()
+            subprocess.run(command, check=True, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise WorkbenchError(f"?????{timeout / 60:.1f} ?????????{log_path}") from exc
+    except subprocess.CalledProcessError as exc:
+        raise WorkbenchError(f"???????? {exc.returncode}???????{log_path}") from exc
+
+
 class SegmentWorkbench:
     """Persisted editor for ACE/RVC segment candidates from a timeline run."""
 
@@ -391,16 +407,31 @@ class SegmentWorkbench:
         ace_audio = candidate_dir / "ace_step_output.wav"
         env = self._environment()
         env["ACESTEP_CHECKPOINTS_DIR"] = str(self.repo_root / "models" / "ace_step" / "checkpoints")
-        _run(self.ace_command(index, seed, caption, lyrics_path, ace_audio), cwd=self.repo_root, env=env)
-        demucs_dir = candidate_dir / "demucs"
-        _run(
-            [
-                str(self.rvc_python), "-m", "demucs.separate", "--two-stems", "vocals",
-                "-n", "htdemucs", "-d", "cuda", "-o", str(demucs_dir), "--", str(ace_audio),
-            ],
-            cwd=self.repo_root,
-            env=env,
-        )
+        try:
+            _run_logged(
+                self.ace_command(index, seed, caption, lyrics_path, ace_audio),
+                candidate_dir / "ace_step.log",
+                timeout=15 * 60,
+                cwd=self.repo_root,
+                env=env,
+            )
+            demucs_dir = candidate_dir / "demucs"
+            _run_logged(
+                [
+                    str(self.rvc_python), "-m", "demucs.separate", "--two-stems", "vocals",
+                    "-n", "htdemucs", "-d", "cuda", "-o", str(demucs_dir), "--", str(ace_audio),
+                ],
+                candidate_dir / "demucs.log",
+                timeout=10 * 60,
+                cwd=self.repo_root,
+                env=env,
+            )
+        except Exception:
+            (candidate_dir / "failed.txt").write_text(
+                "ACE/RVC candidate generation failed; inspect ace_step.log or demucs.log.\n",
+                encoding="utf-8",
+            )
+            raise
         ace_vocals = next(demucs_dir.rglob("vocals.wav"), None)
         if ace_vocals is None:
             raise WorkbenchError("Demucs did not produce ACE vocals")
