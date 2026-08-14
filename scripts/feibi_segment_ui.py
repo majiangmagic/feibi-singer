@@ -13,6 +13,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from feibi_singer.segment_workbench import SegmentWorkbench, WorkbenchError
+from feibi_singer.timeline_pipeline import RVC_F0_CHANGE
 
 
 def _song_id(run_dir: Path) -> str:
@@ -371,7 +372,7 @@ def build_app(workbench: SegmentWorkbench, workspace_dir: Path | None = None):
             ace_generated_audio = gr.Audio(label="ACE 生成旋律", type="filepath")
         gr.Markdown("## 2. RVC 动态升调")
         with gr.Row():
-            f0_change = gr.Slider(-12, 12, value=2, step=1, label="RVC 动态升调（半音）")
+            f0_change = gr.Slider(-12, 12, value=RVC_F0_CHANGE, step=1, label="RVC 动态升调（半音）")
             voice_gain_db = gr.Slider(-6, 12, value=0, step=1, label="试听人声音量增益（dB）")
             generate_rvc_button = gr.Button("用当前 ACE 生成 RVC", variant="primary")
         preview_gain_status = gr.Textbox(

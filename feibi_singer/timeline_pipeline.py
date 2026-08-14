@@ -21,7 +21,7 @@ ACE_CANDIDATE_SEEDS = (44, 43, 45, 46, 47, 48, 49, 50)
 MIN_VOCAL_WINDOW_RMS_DB = -40.0
 MIN_VOCAL_COVERAGE = 0.85
 PREFERRED_VOCAL_COVERAGE = 1.0
-RVC_F0_CHANGE = 2
+RVC_F0_CHANGE = 6
 ACE_CAPTION = (
     "Strict source-melody preservation. Replace only the lyrics. Use a clean, dry, "
     "close-miked lead vocal with exceptionally clear Mandarin diction. Pronounce every "

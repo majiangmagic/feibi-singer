@@ -361,3 +361,19 @@
   5. Verify the preview vocal-gain slider regenerates ACE/RVC plus-original-melody previews and enforces -6 to +12 dB.。
 - 验证证据：39 pytest tests pass, including preview gain range validation and ffmpeg gain-filter assertions; Python compilation and UI construction with the ACE-Step environment pass.。
 - 备注：Generation is deterministic by line index rather than random. Fei-Ba-Fen-Qian is fixed at four syllables; the other five families expand according to their plus-marked groups. Preview-only vocal gain is encoded into separate cached WAV paths; final merge keeps its existing LUFS matching.。
+
+## F24：RVC 默认升调为 +6 半音
+
+- 索引：RVC, 默认值, 升调, +6, CLI, UI
+- 日期：2026-08-14
+- 优先级：2
+- 所属区域：`交互式分段生成`
+- 用户可见行为：新建一次性生成任务、打开分段工作台或直接调用 RVC 推理器时，未显式指定升调则默认使用 +6 半音；用户仍可按段覆盖升调值。。
+- 状态：`passing`
+- 验证步骤：
+  1. 确认 timeline pipeline 的默认 RVC_F0_CHANGE 为 6。；
+  2. 确认缺少 rvc_f0_change 的旧 report 在工作台中回退到 +6。；
+  3. 确认分段 UI 滑块初始化为 +6。；
+  4. 运行完整 pytest、Python 编译和 Harness 检查。。
+- 验证证据：40 项 pytest 通过；缺少 report pitch 字段时的工作台回退测试通过；Python compileall 通过；Harness check 通过。。
+- 备注：携带显式 rvc_f0_change 的旧 report 保持原值；分段手动覆盖和后台 -24 到 +24 半音范围不变。。

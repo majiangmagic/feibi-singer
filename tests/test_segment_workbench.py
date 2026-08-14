@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from feibi_singer.segment_workbench import SegmentWorkbench, WorkbenchError
-from feibi_singer.timeline_pipeline import ACE_CAPTION
+from feibi_singer.timeline_pipeline import ACE_CAPTION, RVC_F0_CHANGE
 
 
 def make_run(tmp_path: Path, segment_count: int = 2) -> Path:
@@ -44,6 +44,21 @@ def make_run(tmp_path: Path, segment_count: int = 2) -> Path:
     }
     (run_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
     return run_dir
+
+
+def test_workbench_uses_default_rvc_pitch_when_report_omits_it(tmp_path):
+    run_dir = make_run(tmp_path)
+    report_path = run_dir / "report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    for segment in report["segmentation"]["segments"]:
+        segment.pop("rvc_f0_change", None)
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    workbench = SegmentWorkbench(run_dir)
+
+    assert workbench.segment(1)["default_f0_change"] == RVC_F0_CHANGE
+    assert workbench.rvc_choices(1, "source-seed-44")[0][1] == f"source-f0-{RVC_F0_CHANGE:+d}"
+    assert workbench.segment(1)["approved"]["f0_change"] == RVC_F0_CHANGE
 
 
 def test_workbench_loads_existing_segment_candidates(tmp_path):

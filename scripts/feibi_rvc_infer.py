@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output")
     parser.add_argument("--model-name", default=os.environ.get("FEIBI_RVC_MODEL_NAME", "feibi"))
     parser.add_argument("--f0-method", default=os.environ.get("FEIBI_RVC_F0_METHOD", "rmvpe"))
-    parser.add_argument("--f0-change", type=int, default=int(os.environ.get("FEIBI_RVC_F0_CHANGE", "0")))
+    parser.add_argument("--f0-change", type=int, default=int(os.environ.get("FEIBI_RVC_F0_CHANGE", "6")))
     parser.add_argument("--hubert-model", default=os.environ.get("FEIBI_RVC_HUBERT_MODEL", "hubert_base.pt"))
     parser.add_argument("--rmvpe-model", default=os.environ.get("FEIBI_RVC_RMVPE_MODEL", "rmvpe.pt"))
     parser.add_argument(

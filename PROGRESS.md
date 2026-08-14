@@ -1,21 +1,21 @@
-﻿# PROGRESS.md
+# PROGRESS.md
 
 ## 项目进度
 
 ### 当前状态
-- 最新 commit: `working-tree`（fix generated candidate preview selection）
-- 测试状态：39 pytest tests passing; feibi_unhappy_sesame4 UI smoke passed; Harness check passing
-- Lint：Python compile and git diff checks passed
+- 最新 commit: `working-tree`（set RVC default pitch to +6 semitones）
+- 测试状态：40 pytest tests passing with PYTEST_DISABLE_PLUGIN_AUTOLOAD=1; default RVC pitch regression covered
+- Lint：Python compilation and Harness validation passed
 
 ### 已完成
 - [x] The automatic lyric generator now cycles through every grammar feasible for each source-line syllable count.
 - [x] Repetition groups marked with plus distribute extra syllables across Fei, Bi, and Jiu instead of padding only Jiu.
 - [x] The segment workbench now exposes a -6 to +12 dB preview vocal gain slider for ACE/RVC plus-original-melody audition.
-- [x] The default ACE caption now uses strict source-melody preservation and explicit clear Mandarin pronunciation guidance for four Feibi syllables.
-- [x] Fixed the segment UI so generating a new ACE candidate does not trigger a selection callback that overwrites its fresh audio with an older candidate.
+- [x] Full-song generation now runs in a background worker with persistent pipeline.log/pipeline_status.json and polling-based completion/failure updates.
+- [x] The default RVC pitch is now +6 semitones while per-segment/manual overrides remain available.
 
 ### 进行中
-- [ ] The candidate preview selection fix is committed; final Harness validation and UI restart remain.
+- [ ] Restart the local UI when a fresh process is needed so it loads the new +6 default.
 
 ### 已知问题
 - Preview vocal gain changes ACE/RVC audition files only; final merge retains integrated-LUFS matching.；
@@ -23,6 +23,5 @@
 - One-syllable source lines cannot satisfy any approved grammar and remain validation failures.。
 
 ### 下一步
-1. Run Harness validation and restart the local UI.。
-
-- [x] Full-song generation now runs in a background worker with persistent pipeline.log/pipeline_status.json and polling-based completion/failure updates, instead of holding the Gradio callback in processing.
+1. Commit the validated default RVC +6 change.；
+2. Restart the local UI when a fresh process is needed so it loads the new +6 default.。

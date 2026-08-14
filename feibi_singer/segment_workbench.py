@@ -11,6 +11,7 @@ from typing import Any
 
 from .timeline_pipeline import (
     ACE_CAPTION,
+    RVC_F0_CHANGE,
     STITCH_HANDLE_SECONDS,
     calculate_vocal_gain_db,
     measure_integrated_lufs,
@@ -120,7 +121,7 @@ class SegmentWorkbench:
             if not source_audio.exists() or not lyrics_path.exists():
                 raise FileNotFoundError(source_audio if not source_audio.exists() else lyrics_path)
             selected_seed = item.get("selected_seed")
-            rvc_f0 = item.get("rvc_f0_change", 2)
+            rvc_f0 = item.get("rvc_f0_change", RVC_F0_CHANGE)
             state_segment = {
                 "index": index,
                 "core_start": item["core_start"],

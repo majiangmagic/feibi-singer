@@ -15,7 +15,7 @@ from feibi_singer.timeline_pipeline import (
 
 
 def test_dynamic_segments_use_locally_approved_rvc_pitch_shift():
-    assert RVC_F0_CHANGE == 2
+    assert RVC_F0_CHANGE == 6
 
 
 def test_ace_default_caption_requires_clear_lyrics_and_strict_melody_preservation():
